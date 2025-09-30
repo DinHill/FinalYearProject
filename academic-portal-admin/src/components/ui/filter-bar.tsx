@@ -57,7 +57,7 @@ export function FilterBar({
 }: FilterBarProps) {
   const [searchInput, setSearchInput] = useState(searchValue);
 
-  const handleFilterToggle = (groupId: string, option: FilterOption, type: "single" | "multi") => {
+  const handleFilterToggle = (groupId: string, option: FilterOption, type: "single" | "multi" | "date") => {
     let newFilters = [...activeFilters];
 
     const existingFilterIndex = newFilters.findIndex(
@@ -72,7 +72,7 @@ export function FilterBar({
       const group = filters.find(f => f.id === groupId);
       if (!group) return;
 
-      if (type === "single") {
+      if (type === "single" || type === "date") {
         // Remove any existing filters for this group
         newFilters = newFilters.filter(f => f.groupId !== groupId);
       }

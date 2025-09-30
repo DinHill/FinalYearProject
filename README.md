@@ -153,12 +153,14 @@ npx expo start
 ### ✅ **Web Services (Can be deployed online):**
 
 #### Backend API (Render)
+
 1. Push to GitHub
 2. Connect to Render
 3. Deploy as web service
 4. Set environment variables
 
 #### Admin Portal (Vercel)
+
 1. Connect GitHub repo
 2. Deploy Next.js app
 3. Configure environment variables
@@ -166,6 +168,7 @@ npx expo start
 ### 📱 **Mobile App (Cannot be deployed to web hosting):**
 
 **Distribution Options:**
+
 - **Development:** Expo Development Build (`npx expo start`)
 - **Testing:** Build APK with EAS (`eas build --platform android --profile preview`)
 - **Production:** App Store distribution (iOS/Android)

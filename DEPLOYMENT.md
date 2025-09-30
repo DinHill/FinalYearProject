@@ -3,8 +3,9 @@
 ## 🚀 **Deployment Overview**
 
 ### **What Can Be Deployed Where:**
+
 - ✅ **Backend API** → Render, Railway, Heroku (Web hosting)
-- ✅ **Admin Portal** → Vercel, Netlify (Web hosting)  
+- ✅ **Admin Portal** → Vercel, Netlify (Web hosting)
 - ❌ **Mobile App** → Cannot be deployed to web hosting
 - 📱 **Mobile App Distribution Options:**
   - App Stores (Apple App Store, Google Play Store)
@@ -151,20 +152,24 @@
 ## 📱 **Mobile App Distribution**
 
 ### **Important Note:**
+
 React Native mobile apps **CANNOT** be deployed to web hosting services like Render or Vercel. They must be distributed through app stores or direct installation.
 
 ### **Development/Testing Options (Free):**
 
 #### **1. Expo Development Build (Recommended for Development)**
+
 ```bash
 cd academic-portal-app
 npx expo start
 ```
+
 - Scan QR code with Expo Go app
 - Perfect for development and testing
 - Share with team members easily
 
 #### **2. Build APK for Android Testing**
+
 ```bash
 # Install EAS CLI
 npm install -g eas-cli
@@ -173,22 +178,26 @@ npm install -g eas-cli
 cd academic-portal-app
 eas build --platform android --profile preview
 ```
+
 - Creates installable APK file
 - Can be shared directly for testing
 - No Google Play Store required
 
 #### **3. Web Export (Limited Functionality)**
+
 ```bash
 cd academic-portal-app
 npx expo export --platform web
 npx serve dist
 ```
+
 - ⚠️ Limited React Native features
 - Good for basic UI demos only
 
 ### **Production Distribution Options:**
 
 #### **1. Google Play Store (Android)**
+
 - Cost: $25 one-time registration fee
 - Review process: 1-3 days
 - Steps:
@@ -198,6 +207,7 @@ npx serve dist
   4. Submit for review
 
 #### **2. Apple App Store (iOS)**
+
 - Cost: $99/year Apple Developer Program
 - Review process: 1-7 days
 - Requires macOS for iOS builds
@@ -208,15 +218,18 @@ npx serve dist
   4. Submit for review
 
 #### **3. Direct Distribution (Android)**
+
 ```bash
 # Build and share APK directly
 eas build --platform android --profile production
 ```
+
 - Share APK file directly
 - Users need to enable "Install from unknown sources"
 - Good for internal/beta testing
 
 ### **Mobile App Testing Strategy:**
+
 1. **Development:** Use Expo Development Build
 2. **Beta Testing:** Build APK and share with testers
 3. **Production:** Submit to app stores
