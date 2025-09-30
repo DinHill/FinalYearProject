@@ -24,17 +24,20 @@ academic-portal/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ and npm
 - Python 3.11+
 - Git
 
 ### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/yourusername/academic-portal.git
 cd academic-portal
 ```
 
 ### 2. Backend Setup
+
 ```bash
 cd backend
 python -m venv venv
@@ -45,6 +48,7 @@ python app/main.py
 ```
 
 ### 3. Admin Portal Setup
+
 ```bash
 cd academic-portal-admin
 npm install
@@ -52,6 +56,7 @@ npm run dev
 ```
 
 ### 4. Mobile App Setup
+
 ```bash
 cd academic-portal-app
 npm install
@@ -67,20 +72,24 @@ npx expo start
 ## 🔐 Demo Credentials
 
 **Admin Login:**
+
 - User ID: `A001`
 - Password: `admin123`
 
 **Teacher Login:**
+
 - User ID: `T001`
 - Password: `teacher123`
 
 **Student Login:**
+
 - User ID: `S001`
 - Password: `student123`
 
 ## 🛠️ Tech Stack
 
 ### Backend
+
 - **FastAPI** - Modern Python web framework
 - **SQLAlchemy** - Database ORM
 - **SQLite** - Database (PostgreSQL for production)
@@ -88,6 +97,7 @@ npx expo start
 - **Uvicorn** - ASGI server
 
 ### Admin Portal
+
 - **Next.js 15** - React framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
@@ -95,6 +105,7 @@ npx expo start
 - **React Hook Form** - Form management
 
 ### Mobile App
+
 - **React Native** - Cross-platform mobile
 - **Expo** - Development platform
 - **TypeScript** - Type safety
@@ -103,6 +114,7 @@ npx expo start
 ## 📚 Features
 
 ### 👨‍💼 Admin Features
+
 - Dashboard with analytics
 - User management (students, teachers)
 - Course and semester management
@@ -111,6 +123,7 @@ npx expo start
 - System settings
 
 ### 👨‍🏫 Teacher Features
+
 - Course management
 - Student enrollment
 - Assignment creation
@@ -119,6 +132,7 @@ npx expo start
 - Chat with students
 
 ### 👨‍🎓 Student Features
+
 - Course enrollment
 - Schedule viewing
 - Assignment submission
@@ -127,6 +141,7 @@ npx expo start
 - Academic calendar
 
 ### 📱 Mobile Features
+
 - Cross-platform (iOS/Android)
 - Offline capability
 - Push notifications
@@ -135,22 +150,34 @@ npx expo start
 
 ## 🚀 Deployment
 
-### Backend (Render)
+### ✅ **Web Services (Can be deployed online):**
+
+#### Backend API (Render)
 1. Push to GitHub
 2. Connect to Render
 3. Deploy as web service
 4. Set environment variables
 
-### Frontend (Vercel)
+#### Admin Portal (Vercel)
 1. Connect GitHub repo
 2. Deploy Next.js app
 3. Configure environment variables
+
+### 📱 **Mobile App (Cannot be deployed to web hosting):**
+
+**Distribution Options:**
+- **Development:** Expo Development Build (`npx expo start`)
+- **Testing:** Build APK with EAS (`eas build --platform android --profile preview`)
+- **Production:** App Store distribution (iOS/Android)
+
+**Note:** React Native apps require app store distribution or direct APK installation. They cannot be hosted on web platforms like Render/Vercel.
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 
 ## 🔧 Environment Variables
 
 ### Backend (.env)
+
 ```env
 ENVIRONMENT=development
 SECRET_KEY=your-secret-key
@@ -159,12 +186,14 @@ DATABASE_URL=sqlite:///./academic_portal.db
 ```
 
 ### Admin Portal (.env.local)
+
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 NEXT_PUBLIC_ENVIRONMENT=development
 ```
 
 ### Mobile App (.env)
+
 ```env
 EXPO_PUBLIC_API_BASE_URL=http://localhost:8000
 EXPO_PUBLIC_ENVIRONMENT=development
@@ -173,24 +202,28 @@ EXPO_PUBLIC_ENVIRONMENT=development
 ## 📖 API Documentation
 
 The API documentation is automatically generated and available at:
+
 - Development: http://localhost:8000/docs
 - Production: https://your-api.onrender.com/docs
 
 ## 🧪 Testing
 
 ### Backend
+
 ```bash
 cd backend
 pytest
 ```
 
 ### Frontend
+
 ```bash
 cd academic-portal-admin
 npm test
 ```
 
 ### Mobile
+
 ```bash
 cd academic-portal-app
 npm test
@@ -211,6 +244,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🤝 Support
 
 If you have any questions or issues:
+
 - Create an issue on GitHub
 - Contact: your-email@example.com
 
