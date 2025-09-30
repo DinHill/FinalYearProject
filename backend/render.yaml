@@ -1,0 +1,14 @@
+# Render Deployment Configuration
+build:
+  buildCommand: pip install -r requirements.txt
+  startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+env:
+  - name: ENVIRONMENT
+    value: production
+  - name: DATABASE_URL
+    value: sqlite:///./academic_portal.db
+  - name: SECRET_KEY
+    generateValue: true
+  - name: DEBUG
+    value: false
