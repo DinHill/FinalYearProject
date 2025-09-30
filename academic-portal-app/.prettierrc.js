@@ -1,0 +1,5 @@
+// .prettierrc
+{
+  "singleQuote": true,
+  "trailingComma": "all"
+}
