@@ -1,8 +1,8 @@
 import os
 from typing import List, Optional
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     # Project Information
     PROJECT_NAME: str = "Academic Portal API"
     VERSION: str = "1.0.0"
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql://admin:password@localhost:5432/academic_portal"
+        "sqlite:///./academic_portal.db"
     )
     
     # Firebase Configuration

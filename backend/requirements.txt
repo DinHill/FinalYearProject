@@ -8,7 +8,6 @@ sqlalchemy==1.4.50
 
 # Validation and serialization - using older versions to avoid Rust compilation
 pydantic==1.10.12
-pydantic-settings==1.10.12
 
 # Authentication and security - using PyJWT instead of python-jose
 PyJWT==2.8.0
