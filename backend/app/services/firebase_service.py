@@ -1,8 +1,14 @@
 """
 Firebase Admin SDK service for backend authentication and real-time features
 """
-import firebase_admin
-from firebase_admin import credentials, auth, firestore, storage
+try:
+    import firebase_admin
+    from firebase_admin import credentials, auth, firestore, storage
+    FIREBASE_AVAILABLE = True
+except ImportError:
+    FIREBASE_AVAILABLE = False
+    firebase_admin = None
+    
 from typing import Optional, Dict, Any
 import json
 import logging
@@ -20,6 +26,10 @@ class FirebaseService:
     def _initialize_firebase(self):
         """Initialize Firebase Admin SDK"""
         try:
+            if not FIREBASE_AVAILABLE:
+                logger.warning("Firebase Admin SDK not installed - skipping initialization")
+                return
+                
             if not settings.FIREBASE_PROJECT_ID:
                 logger.warning("Firebase not configured - skipping initialization")
                 return

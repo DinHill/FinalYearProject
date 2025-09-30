@@ -85,14 +85,15 @@ settings = Settings()
 if settings.ENVIRONMENT == "production":
     required_settings = [
         "SECRET_KEY",
-        "DATABASE_URL", 
-        "FIREBASE_PROJECT_ID",
-        "FIREBASE_PRIVATE_KEY",
-        "FIREBASE_CLIENT_EMAIL"
+        "DATABASE_URL"
+        # Firebase settings are optional for now - can be added later
+        # "FIREBASE_PROJECT_ID",
+        # "FIREBASE_PRIVATE_KEY", 
+        # "FIREBASE_CLIENT_EMAIL"
     ]
     
     missing = [setting for setting in required_settings 
-               if not getattr(settings, setting)]
+               if not getattr(settings, setting) or getattr(settings, setting) == "your-super-secret-key-change-this"]
     
     if missing:
         raise ValueError(f"Missing required settings: {', '.join(missing)}")
