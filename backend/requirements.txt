@@ -42,7 +42,7 @@ aiohttp==3.9.1
 # PDF Generation
 reportlab==4.0.9
 pypdf==3.17.4
-python-qrcode[pil]==7.4.2
+qrcode[pil]==7.4.2
 
 # AI Integration
 openai==1.10.0
