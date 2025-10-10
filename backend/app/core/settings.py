@@ -49,14 +49,14 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
     REDIS_MAX_CONNECTIONS: int = 50
     
-    # OpenAI
-    OPENAI_API_KEY: str
+    # OpenAI (Optional - for AI chat feature)
+    OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     OPENAI_MAX_TOKENS: int = 500
     OPENAI_TEMPERATURE: float = 0.7
     
-    # SendGrid
-    SENDGRID_API_KEY: str
+    # SendGrid (Optional - for email notifications)
+    SENDGRID_API_KEY: Optional[str] = None
     SENDGRID_FROM_EMAIL: str = "noreply@greenwich.edu.vn"
     SENDGRID_FROM_NAME: str = "Greenwich University"
     
