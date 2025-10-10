@@ -1,167 +1,222 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+"""
+Main FastAPI application
+"""
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 import logging
-import uvicorn
-import asyncio
-import signal
-import sys
+import time
 
-# Import core modules
-from app.core.config import settings
-from app.core.database import init_db, close_db, check_db_health
-
-# Import API routers
-from app.api import api_router
+from app.core import settings, initialize_firebase, init_db, close_db
+from app.core.exceptions import APIException
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO if settings.DEBUG else logging.WARNING,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=getattr(logging, settings.LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI application
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events
+    """
+    # Startup
+    logger.info("🚀 Starting Academic Portal API...")
+    
+    # Initialize Firebase
+    try:
+        initialize_firebase()
+        logger.info("✅ Firebase initialized")
+    except Exception as e:
+        logger.error(f"❌ Firebase initialization failed: {e}")
+        raise
+    
+    # Initialize Database (optional - use Alembic migrations instead)
+    # await init_db()
+    # logger.info("✅ Database initialized")
+    
+    logger.info(f"✅ {settings.APP_NAME} v{settings.APP_VERSION} started successfully")
+    logger.info(f"📝 Environment: {settings.APP_ENV}")
+    logger.info(f"🌐 CORS origins: {settings.CORS_ORIGINS}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Shutting down Academic Portal API...")
+    await close_db()
+    logger.info("✅ Shutdown complete")
+
+
+# Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description=settings.DESCRIPTION,
-    version=settings.VERSION,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None,
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="Greenwich University Academic Portal - Backend API",
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
+    openapi_url="/api/openapi.json" if settings.DEBUG else None,
+    lifespan=lifespan
 )
 
-# Security
-security = HTTPBearer()
 
-# Add CORS middleware - More permissive for local development and school networks
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development/testing
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
-    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    try:
-        logger.info("Starting Academic Portal API...")
-        # Initialize database
-        await init_db()
-        logger.info("Database initialized successfully")
-        logger.info(f"API running in {settings.ENVIRONMENT} mode")
-    except Exception as e:
-        logger.error(f"Startup error: {e}")
-        # Don't raise for now to allow testing without database
-        # raise
 
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    try:
-        logger.info("Shutting down Academic Portal API...")
-        await close_db()
-        logger.info("Database connections closed")
-    except Exception as e:
-        logger.error(f"Shutdown error: {e}")
+# Request ID Middleware
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    """Add request ID to all requests for tracing"""
+    import uuid
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    
+    # Add to logging context
+    logger.info(f"Request {request_id}: {request.method} {request.url.path}")
+    
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
-# Global exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Handle uncaught exceptions"""
-    logger.error(f"Global exception: {exc}")
+
+# Timing Middleware
+@app.middleware("http")
+async def add_process_time(request: Request, call_next):
+    """Add processing time header"""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    
+    # Log slow requests
+    if process_time > 1.0:  # > 1 second
+        logger.warning(
+            f"Slow request: {request.method} {request.url.path} "
+            f"took {process_time:.2f}s"
+        )
+    
+    return response
+
+
+# Exception Handlers
+@app.exception_handler(APIException)
+async def api_exception_handler(request: Request, exc: APIException):
+    """Handle custom API exceptions"""
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error"}
+        status_code=exc.status_code,
+        content={
+            "code": exc.code,
+            "detail": exc.detail,
+            "fields": exc.fields
+        }
     )
 
-# Root endpoint
-@app.get("/", tags=["Root"])
-async def root():
-    """API root endpoint"""
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors"""
+    errors = {}
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error["loc"])
+        errors[field] = error["msg"]
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "code": "VALIDATION_ERROR",
+            "detail": "Request validation failed",
+            "fields": errors
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle unexpected exceptions"""
+    logger.error(f"Unexpected error: {exc}", exc_info=True)
+    
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "code": "INTERNAL_SERVER_ERROR",
+            "detail": "An unexpected error occurred" if not settings.DEBUG else str(exc)
+        }
+    )
+
+
+# Health Check Endpoints
+@app.get("/health", tags=["System"])
+async def health_check():
+    """Health check endpoint"""
     return {
-        "message": "Academic Portal API",
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT,
-        "docs_url": "/docs" if settings.DEBUG else "Documentation disabled in production",
-        "status": "healthy"
+        "status": "healthy",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "environment": settings.APP_ENV
     }
 
-# Health check endpoint
-@app.get("/health", tags=["Health"])
-async def health_check():
-    """Comprehensive health check"""
-    try:
-        # Check database connectivity
-        db_healthy = check_db_health()
-        
-        health_status = {
-            "status": "healthy" if db_healthy else "unhealthy",
-            "version": settings.VERSION,
-            "environment": settings.ENVIRONMENT,
-            "database": "connected" if db_healthy else "disconnected",
-            "timestamp": "2024-12-30T00:00:00Z"  # We'll use datetime.now() when we import it
-        }
-        
-        if not db_healthy:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=health_status
-            )
-            
-        return health_status
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "unhealthy",
-                "error": "Health check failed",
-                "timestamp": "2024-12-30T00:00:00Z"
-            }
-        )
 
-# Include API routers
-app.include_router(api_router)
+@app.get("/api/v1/health", tags=["System"])
+async def api_health_check():
+    """API health check endpoint"""
+    return {
+        "status": "healthy",
+        "api_version": "v1"
+    }
 
-# Development server with network-friendly settings
+
+# Root endpoint
+@app.get("/", tags=["System"])
+async def root():
+    """Root endpoint"""
+    return {
+        "message": f"Welcome to {settings.APP_NAME}",
+        "version": settings.APP_VERSION,
+        "docs": "/api/docs" if settings.DEBUG else "Documentation disabled in production",
+        "health": "/health"
+    }
+
+
+# Import and include routers
+from app.routers import (
+    auth_router,
+    users_router,
+    academic_router,
+    finance_router,
+    documents_router,
+    support_router
+)
+
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
+app.include_router(academic_router, prefix="/api/v1")
+app.include_router(finance_router, prefix="/api/v1")
+app.include_router(documents_router, prefix="/api/v1")
+app.include_router(support_router, prefix="/api/v1")
+
+# More routers to be added:
+# from app.routers import analytics
+# app.include_router(analytics.router, prefix="/api/v1")
+
+
 if __name__ == "__main__":
-    import os
-    
-    # Handle Ctrl+C gracefully
-    def signal_handler(sig, frame):
-        print("\nShutting down gracefully...")
-        sys.exit(0)
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    # Get port from environment (for deployment) or default to 8000
-    port = int(os.environ.get("PORT", 8000))
-    host = "0.0.0.0" if os.environ.get("ENVIRONMENT") == "production" else "127.0.0.1"
-    
+    import uvicorn
     uvicorn.run(
         "app.main:app",
-        host=host,
-        port=port,
-        reload=settings.DEBUG,
-        log_level="info" if settings.DEBUG else "warning",
-        access_log=True,
-        use_colors=True,
-        # Network timeout configurations
-        timeout_keep_alive=30,
-        timeout_graceful_shutdown=30,
-        # Limit concurrent connections for stability
-        limit_concurrency=100,
-        limit_max_requests=1000,
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.RELOAD,
+        log_level=settings.LOG_LEVEL.lower()
     )

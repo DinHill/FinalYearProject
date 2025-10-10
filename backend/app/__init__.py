@@ -1,1 +1,4 @@
-# Academic Portal Backend Package
+"""
+Greenwich Academic Portal Backend API
+"""
+__version__ = "1.0.0"

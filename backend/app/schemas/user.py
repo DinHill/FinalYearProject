@@ -1,102 +1,136 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
-from datetime import datetime
-from enum import Enum
+"""
+User schemas
+"""
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional
+from datetime import date, datetime
+from app.schemas.base import BaseSchema
 
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    TEACHER = "teacher"
-    STUDENT = "student"
 
-class UserStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    SUSPENDED = "suspended"
+class UserBase(BaseSchema):
+    """Base user schema"""
+    username: str
+    email: EmailStr
+    full_name: str
+    role: str
+    campus_id: Optional[int] = None
+    major_id: Optional[int] = None
 
-class UserBase(BaseModel):
-    email: Optional[str] = Field(None, description="Optional email for notifications")
-    full_name: str = Field(..., min_length=1, max_length=255)
-    role: UserRole
-    phone_number: Optional[str] = Field(None, max_length=20)
-    student_id: Optional[str] = Field(None, max_length=50)
-    employee_id: Optional[str] = Field(None, max_length=50)
-    department: Optional[str] = Field(None, max_length=100)
-    campus: Optional[str] = Field(None, max_length=100)
 
 class UserCreate(BaseModel):
-    user_id: str = Field(..., min_length=1, max_length=50)
-    password: str = Field(..., min_length=6, max_length=100)
-    full_name: str = Field(..., min_length=1, max_length=255)
-    role: UserRole
-    email: Optional[str] = None
+    """Create user request"""
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=255)
+    role: str = Field(..., pattern="^(student|teacher|admin)$")
+    
+    # Academic Context
+    campus_id: int = Field(..., gt=0)
+    major_id: Optional[int] = Field(None, gt=0)
+    year_entered: Optional[int] = None
+    
+    # Profile
     phone_number: Optional[str] = Field(None, max_length=20)
-    department: Optional[str] = Field(None, max_length=100)
-    campus: Optional[str] = Field(None, max_length=100)
-    avatar_url: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = Field(None, pattern="^(male|female|other)$")
+    
+    # Password (for students)
+    password: Optional[str] = Field(None, min_length=8, max_length=100)
+    
+    @field_validator('full_name')
+    @classmethod
+    def validate_full_name(cls, v: str) -> str:
+        """Validate full name"""
+        v = v.strip()
+        if not v:
+            raise ValueError("Full name cannot be empty")
+        
+        # Check for Vietnamese characters
+        import re
+        if not re.match(r'^[a-zA-ZÀ-ỹ\s]+$', v):
+            raise ValueError("Name contains invalid characters")
+        
+        return v.title()
+    
+    @field_validator('year_entered')
+    @classmethod
+    def validate_year(cls, v: Optional[int]) -> Optional[int]:
+        """Validate year entered"""
+        if v is not None:
+            current_year = datetime.now().year
+            if v < 2000 or v > current_year + 1:
+                raise ValueError(f"Year must be between 2000 and {current_year + 1}")
+        return v
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "email": "hieund@student.greenwich.edu.vn",
+                "full_name": "Nguyen Dinh Hieu",
+                "role": "student",
+                "campus_id": 2,
+                "major_id": 1,
+                "year_entered": 2022,
+                "phone_number": "0123456789",
+                "date_of_birth": "2002-01-15",
+                "gender": "male",
+                "password": "SecurePass123"
+            }
+        }
+    }
+
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    """Update user request"""
+    full_name: Optional[str] = Field(None, min_length=2, max_length=255)
     phone_number: Optional[str] = Field(None, max_length=20)
-    department: Optional[str] = Field(None, max_length=100)
-    campus: Optional[str] = Field(None, max_length=100)
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = Field(None, pattern="^(male|female|other)$")
     avatar_url: Optional[str] = None
-    status: Optional[UserStatus] = None
 
-class UserResponse(BaseModel):
+
+class UserResponse(BaseSchema):
+    """User response"""
     id: int
-    student_id: Optional[str] = None
-    employee_id: Optional[str] = None
-    email: Optional[str] = None
+    firebase_uid: str
+    username: str
+    email: str
     full_name: str
-    role: UserRole
-    status: UserStatus
+    role: str
+    status: str
+    
+    # Profile
     phone_number: Optional[str] = None
-    department: Optional[str] = None
-    campus: Optional[str] = None
     avatar_url: Optional[str] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    
+    # Academic Context
+    campus_id: Optional[int] = None
+    major_id: Optional[int] = None
+    year_entered: Optional[int] = None
+    
+    # Timestamps
     last_login: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
 
-    @property
-    def user_id(self) -> str:
-        """Returns the appropriate ID based on user role"""
-        if self.role == UserRole.STUDENT:
-            return self.student_id or ""
-        else:
-            return self.employee_id or ""
 
-    class Config:
-        from_attributes = True
+class CampusResponse(BaseSchema):
+    """Campus response"""
+    id: int
+    code: str
+    name: str
+    city: Optional[str] = None
+    is_active: bool
+    created_at: datetime
 
-class UserListResponse(BaseModel):
-    users: List[UserResponse]
-    total: int
-    page: int
-    size: int
-    total_pages: int
 
-# Authentication schemas
-class LoginRequest(BaseModel):
-    user_id: str = Field(..., min_length=1, max_length=50, description="Student ID or Employee ID")
-    password: str = Field(..., min_length=6, max_length=100)
-
-class RegisterRequest(BaseModel):
-    user_id: str = Field(..., min_length=1, max_length=50, description="Student ID or Employee ID")
-    password: str = Field(..., min_length=6, max_length=100)
-    full_name: str = Field(..., min_length=1, max_length=255)
-    role: UserRole
-    phone_number: Optional[str] = Field(None, max_length=20)
-    department: Optional[str] = Field(None, max_length=100)
-    campus: Optional[str] = Field(None, max_length=100)
-    email: Optional[str] = Field(None, description="Optional email for notifications")
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
-    user: UserResponse
-
-class TokenData(BaseModel):
-    user_id: Optional[str] = None
-    role: Optional[str] = None
+class MajorResponse(BaseSchema):
+    """Major response"""
+    id: int
+    code: str
+    name: str
+    degree_type: Optional[str] = None
+    credits_required: int
+    is_active: bool
+    created_at: datetime

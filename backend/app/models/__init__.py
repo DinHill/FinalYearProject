@@ -1,27 +1,53 @@
-# Import all models to ensure they are registered with SQLAlchemy
-from .user import User, UserRole, UserStatus, Base
-from .academic import Semester, Course, CourseSection, SemesterType, CourseStatus
-from .schedule import Schedule, SpecialEvent, DayOfWeek, ScheduleType
-from .enrollment import Enrollment, Assignment, Grade, EnrollmentStatus, GradeStatus
-from .chat import ChatRoom, ChatParticipant, Message, MessageType, MessageStatus
+"""
+Models package - imports all models
+"""
+from app.models.base import BaseModel
+from app.models.user import (
+    User, Campus, Major, UsernameSequence, StudentSequence, DeviceToken,
+    UserRole, UserStatus, Gender
+)
+from app.models.academic import (
+    Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance,
+    SemesterType, CourseLevel, SectionStatus, EnrollmentStatus, AttendanceStatus,
+    AssignmentType, GradeStatus
+)
+from app.models.finance import (
+    FeeStructure, Invoice, InvoiceLine, Payment,
+    InvoiceStatus, PaymentMethod, PaymentStatus
+)
+from app.models.document import (
+    Document, DocumentRequest, Announcement,
+    DocumentCategory, DocumentVisibility, DocumentRequestType, DocumentRequestStatus,
+    DeliveryMethod, AnnouncementCategory, Priority
+)
+from app.models.communication import (
+    ChatRoom, ChatParticipant, SupportTicket, TicketEvent,
+    RoomType, ParticipantRole, TicketCategory, TicketPriority, TicketStatus, EventType
+)
 
-# Export all models for easy importing
 __all__ = [
     # Base
-    "Base",
+    "BaseModel",
     
     # User models
-    "User", "UserRole", "UserStatus",
+    "User", "Campus", "Major", "UsernameSequence", "StudentSequence", "DeviceToken",
+    "UserRole", "UserStatus", "Gender",
     
     # Academic models
-    "Semester", "Course", "CourseSection", "SemesterType", "CourseStatus",
+    "Semester", "Course", "CourseSection", "Schedule", "Enrollment", "Assignment", "Grade", "Attendance",
+    "SemesterType", "CourseLevel", "SectionStatus", "EnrollmentStatus", "AttendanceStatus",
+    "AssignmentType", "GradeStatus",
     
-    # Schedule models
-    "Schedule", "SpecialEvent", "DayOfWeek", "ScheduleType",
+    # Finance models
+    "FeeStructure", "Invoice", "InvoiceLine", "Payment",
+    "InvoiceStatus", "PaymentMethod", "PaymentStatus",
     
-    # Enrollment and grading models
-    "Enrollment", "Assignment", "Grade", "EnrollmentStatus", "GradeStatus",
+    # Document models
+    "Document", "DocumentRequest", "Announcement",
+    "DocumentCategory", "DocumentVisibility", "DocumentRequestType", "DocumentRequestStatus",
+    "DeliveryMethod", "AnnouncementCategory", "Priority",
     
-    # Chat models
-    "ChatRoom", "ChatParticipant", "Message", "MessageType", "MessageStatus",
+    # Communication models
+    "ChatRoom", "ChatParticipant", "SupportTicket", "TicketEvent",
+    "RoomType", "ParticipantRole", "TicketCategory", "TicketPriority", "TicketStatus", "EventType",
 ]
