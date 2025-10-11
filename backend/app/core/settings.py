@@ -37,11 +37,11 @@ class Settings(BaseSettings):
     FIREBASE_AUTH_URI: str = "https://accounts.google.com/o/oauth2/auth"
     FIREBASE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"
     FIREBASE_AUTH_PROVIDER_CERT_URL: str = "https://www.googleapis.com/oauth2/v1/certs"
-    FIREBASE_CLIENT_CERT_URL: str
+    FIREBASE_CLIENT_CERT_URL: Optional[str] = None
     
-    # Google Cloud Storage
-    GCP_PROJECT_ID: str
-    GCS_BUCKET_NAME: str
+    # Google Cloud Storage (Optional - for file uploads)
+    GCP_PROJECT_ID: Optional[str] = None
+    GCS_BUCKET_NAME: Optional[str] = None
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
     
     # Redis
