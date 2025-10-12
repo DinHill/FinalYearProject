@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/proxy/:path*',
+        destination: 'https://academic-portal-api.onrender.com/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

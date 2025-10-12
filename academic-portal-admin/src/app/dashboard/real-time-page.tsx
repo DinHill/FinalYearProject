@@ -5,12 +5,12 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, TrendingUp, Users, BookOpen, GraduationCap, FileText, AlertTriangle, Activity } from 'lucide-react'
-import { useDashboardStats, useFirebaseStatus } from '@/lib/hooks'
+import { useDashboardStats } from '@/lib/hooks'
 import { formatDate } from '@/lib/utils'
 
 export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats()
-  const { data: firebaseStatus } = useFirebaseStatus()
+  // Firebase status removed - will be re-added after backend rebuild
 
   if (statsLoading) {
     return (
@@ -101,22 +101,15 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Firebase Status</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">Backend Status</h3>
                   <p className="text-lg font-semibold mt-2">
-                    {firebaseStatus?.initialized ? (
-                      <span className="text-green-600 flex items-center">
-                        <Activity className="w-4 h-4 mr-1" />
-                        Connected
-                      </span>
-                    ) : (
-                      <span className="text-red-600 flex items-center">
-                        <AlertTriangle className="w-4 h-4 mr-1" />
-                        Disconnected
-                      </span>
-                    )}
+                    <span className="text-yellow-600 flex items-center">
+                      <AlertTriangle className="w-4 h-4 mr-1" />
+                      Rebuilding
+                    </span>
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {firebaseStatus?.project_id || 'No project'}
+                    Academic Portal Backend
                   </p>
                 </div>
                 <GraduationCap className="w-8 h-8 text-orange-500" />
@@ -173,40 +166,26 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Firebase</span>
-                  <span className={`text-sm flex items-center ${
-                    firebaseStatus?.initialized ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {firebaseStatus?.initialized ? (
-                      <>
-                        <Activity className="w-3 h-3 mr-1" />
-                        Connected
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Disconnected
-                      </>
-                    )}
+                  <span className="text-sm font-medium">Backend API</span>
+                  <span className="text-sm flex items-center text-yellow-600">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Rebuilding
                   </span>
                 </div>
-                {firebaseStatus?.services && (
-                  <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-sm font-medium mb-2">Firebase Services</h4>
-                    <div className="space-y-2">
-                      {Object.entries(firebaseStatus.services).map(([service, status]) => (
-                        <div key={service} className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {service}
-                          </span>
-                          <span className={`text-xs ${status ? 'text-green-600' : 'text-red-600'}`}>
-                            {status ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      ))}
+                {/* Services status will be re-added after backend rebuild */}
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-sm font-medium mb-2">Backend Services</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Authentication</span>
+                      <span className="text-xs text-yellow-600">Rebuilding</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Database</span>
+                      <span className="text-xs text-yellow-600">Rebuilding</span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </CardContent>
           </Card>

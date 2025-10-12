@@ -1,49 +1,62 @@
-import React, { createContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth } from '../services/firebaseConfig';
-import { saveUserData, clearUserData } from '../utils/authUtils';
+// AuthContext removed - will be re-added after backend rebuild
+// This will be rebuilt to work with the new backend API
+
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  // Additional properties will be added when backend is rebuilt
+}
 
 interface AuthContextType {
   user: User | null;
-  setUser: (user: User | null) => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  setUser: () => {},
-  logout: async () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        // Get existing user data to preserve campus info
-        const existingData = await AsyncStorage.getItem('userData');
-        const userData = existingData ? JSON.parse(existingData) : {};
-        await saveUserData(firebaseUser, userData.campus);
-      } else {
-        setUser(null);
-        await clearUserData();
-      }
-    });
-    return unsubscribe;
+    // Auth state management will be implemented after backend rebuild
+    setLoading(false);
   }, []);
 
-  const logout = async () => {
-    await signOut(auth);
-    setUser(null);
-    await clearUserData();
+  const login = async (email: string, password: string) => {
+    // Login implementation will be rebuilt
+    console.log('Login - to be implemented');
   };
 
-  return (
-    <AuthContext.Provider value={{ user, setUser, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const logout = async () => {
+    // Logout implementation will be rebuilt
+    console.log('Logout - to be implemented');
+    setUser(null);
+  };
+
+  const value = {
+    user,
+    loading,
+    login,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

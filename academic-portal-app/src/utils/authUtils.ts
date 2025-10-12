@@ -1,47 +1,29 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from 'firebase/auth';
+// Auth utilities removed - will be re-added after backend rebuild
+// These functions will be rebuilt to work with the new backend API
 
-export const saveUserData = async (user: User, campus?: string) => {
-  try {
-    const userData = {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      campus: campus || '',
-      lastLogin: new Date().toISOString(),
-    };
-    
-    await AsyncStorage.setItem('userData', JSON.stringify(userData));
-    if (campus) {
-      await AsyncStorage.setItem('userCampus', campus);
-    }
-    
-    console.log('User data saved successfully');
-  } catch (error) {
-    console.error('Error saving user data:', error);
-  }
+export const saveUserData = async (user: any, campus?: string) => {
+  // Implementation will be rebuilt
+  console.log('saveUserData - to be implemented');
 };
 
 export const getUserData = async () => {
-  try {
-    const userData = await AsyncStorage.getItem('userData');
-    return userData ? JSON.parse(userData) : null;
-  } catch (error) {
-    console.error('Error getting user data:', error);
-    return null;
-  }
+  // Implementation will be rebuilt
+  console.log('getUserData - to be implemented');
+  return null;
 };
 
 export const clearUserData = async () => {
-  try {
-    await AsyncStorage.multiRemove(['userData', 'userCampus']);
-    console.log('User data cleared successfully');
-  } catch (error) {
-    console.error('Error clearing user data:', error);
-  }
+  // Implementation will be rebuilt
+  console.log('clearUserData - to be implemented');
 };
 
-export const validateCampus = (campus: string | null): boolean => {
-  return campus !== null && campus.trim() !== '';
-}; 
+export const getUserRole = async () => {
+  // Implementation will be rebuilt
+  console.log('getUserRole - to be implemented');
+  return null;
+};
+
+export const updateUserCampus = async (campus: string) => {
+  // Implementation will be rebuilt
+  console.log('updateUserCampus - to be implemented');
+};

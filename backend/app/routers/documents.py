@@ -33,8 +33,13 @@ from app.schemas.document import (
     AnnouncementResponse,
 )
 from app.services.gcs_service import gcs_service
+from app.services.cloudinary_service import cloudinary_service
+from app.core.settings import settings
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
+
+# Determine which storage service to use
+storage_service = cloudinary_service if settings.CLOUDINARY_CLOUD_NAME else gcs_service
 
 
 @router.post("/upload-url", response_model=DocumentUploadUrlResponse)
@@ -55,15 +60,15 @@ async def generate_upload_url(
     
     Client should:
     1. Call this endpoint to get upload URL
-    2. Upload file directly to GCS using PUT request
+    2. Upload file directly to storage (Cloudinary or GCS) using POST/PUT request
     3. Call POST /documents to save metadata
     """
     # Generate unique file path
-    file_path = gcs_service.generate_file_path(
+    file_path = storage_service.generate_file_path(
         category=request.category,
-        user_id=str(current_user.id),
+        user_id=str(current_user.id) if hasattr(storage_service, '__name__') and 'gcs' in storage_service.__name__ else current_user.id,
         filename=request.filename,
-        include_timestamp=True,
+        add_timestamp=True,
     )
     
     # Validate file size
@@ -74,7 +79,7 @@ async def generate_upload_url(
         max_size = 100 * 1024 * 1024  # 100MB for assignments
     
     # Generate presigned upload URL
-    upload_data = gcs_service.generate_upload_url(
+    upload_data = storage_service.generate_upload_url(
         file_path=file_path,
         content_type=request.content_type,
         expiration=3600,  # 1 hour
@@ -82,7 +87,7 @@ async def generate_upload_url(
     )
     
     return DocumentUploadUrlResponse(
-        upload_url=upload_data["upload_url"],
+        upload_url=upload_data.get("upload_url") or upload_data.get("url"),
         file_path=upload_data["file_path"],
         expires_at=upload_data["expires_at"],
         method=upload_data["method"],

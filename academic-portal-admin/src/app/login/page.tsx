@@ -9,8 +9,8 @@ import { Eye, EyeOff, Building2, Shield, User, Lock, Loader2 } from 'lucide-reac
 import { useLogin } from '@/lib/hooks';
 
 export default function LoginPage() {
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
+  const [userId, setUserId] = useState('admin001');
+  const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   
