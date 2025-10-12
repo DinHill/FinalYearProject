@@ -1,7 +1,8 @@
 """
 Academic models - courses, enrollments, grades, attendance
 """
-from sqlalchemy import Column, Integer, String, Boolean, Date, Time, DateTime, ForeignKey, Numeric, Text, Enum as SQLEnum, CheckConstraint, UniqueConstraint, JSONB
+from sqlalchemy import Column, Integer, String, Boolean, Date, Time, DateTime, ForeignKey, Numeric, Text, Enum as SQLEnum, CheckConstraint, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 import enum
