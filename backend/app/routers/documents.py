@@ -32,7 +32,7 @@ from app.schemas.document import (
     AnnouncementCreate,
     AnnouncementResponse,
 )
-from app.services.gcs_service import gcs_service
+from app.services.gcs_service import get_gcs_service
 from app.services.cloudinary_service import cloudinary_service
 from app.core.settings import settings
 
@@ -134,13 +134,15 @@ async def create_document(
     
     This should be called after uploading the file to GCS using presigned URL.
     """
-    # Verify file exists in GCS
-    if not gcs_service.file_exists(document_data.file_path):
+    storage_service = get_storage_service()
+    
+    # Verify file exists in storage
+    if not storage_service.file_exists(document_data.file_path):
         raise BusinessLogicError("File not found in storage. Please upload the file first.")
     
-    # Get file metadata from GCS
+    # Get file metadata from storage
     try:
-        file_metadata = gcs_service.get_file_metadata(document_data.file_path)
+        file_metadata = storage_service.get_file_metadata(document_data.file_path)
     except FileNotFoundError:
         raise BusinessLogicError("File not found in storage")
     
@@ -269,9 +271,11 @@ async def generate_download_url(
                 detail="You don't have permission to download this document"
             )
     
+    storage_service = get_storage_service()
+    
     # Generate download URL
     try:
-        download_data = gcs_service.generate_download_url(
+        download_data = storage_service.generate_download_url(
             file_path=document.file_path,
             expiration=3600,  # 1 hour
             disposition=disposition,
@@ -317,8 +321,10 @@ async def delete_document(
             detail="You can only delete your own documents"
         )
     
-    # Delete file from GCS
-    gcs_service.delete_file(document.file_path)
+    storage_service = get_storage_service()
+    
+    # Delete file from storage
+    storage_service.delete_file(document.file_path)
     
     # Delete metadata from database
     await db.delete(document)
