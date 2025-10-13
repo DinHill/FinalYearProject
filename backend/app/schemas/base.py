@@ -2,8 +2,11 @@
 Base Pydantic schemas
 """
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, Generic, TypeVar
 from datetime import datetime
+
+
+T = TypeVar('T')
 
 
 class BaseSchema(BaseModel):
@@ -31,9 +34,9 @@ class PaginationParams(BaseModel):
     )
 
 
-class PaginatedResponse(BaseModel):
+class PaginatedResponse(BaseModel, Generic[T]):
     """Paginated response wrapper"""
-    data: list
+    data: list[T]
     pagination: dict
     
     model_config = ConfigDict(
