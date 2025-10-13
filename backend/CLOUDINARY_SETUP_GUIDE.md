@@ -3,6 +3,7 @@
 ## Quick Setup (5 minutes)
 
 ### Why Cloudinary?
+
 - ✅ **FREE:** 25GB storage + 25GB bandwidth/month
 - ✅ **No credit card required**
 - ✅ Easy integration
@@ -37,6 +38,7 @@ API Secret: abcdefghijklmnopqrstuvwxyz
 **Copy all three values!** You'll need them for Render.
 
 ### Where to Find Them Later:
+
 1. Go to: https://console.cloudinary.com/console
 2. Click on **"Settings"** (gear icon) in the top right
 3. Go to **"Access Keys"** tab
@@ -53,10 +55,10 @@ API Secret: abcdefghijklmnopqrstuvwxyz
 
 Add these variables:
 
-| Key | Value | Where to Get It |
-|-----|-------|-----------------|
+| Key                     | Value           | Where to Get It      |
+| ----------------------- | --------------- | -------------------- |
 | `CLOUDINARY_CLOUD_NAME` | Your cloud name | Cloudinary Dashboard |
-| `CLOUDINARY_API_KEY` | Your API key | Cloudinary Dashboard |
+| `CLOUDINARY_API_KEY`    | Your API key    | Cloudinary Dashboard |
 | `CLOUDINARY_API_SECRET` | Your API secret | Cloudinary Dashboard |
 
 5. Click **Save Changes**
@@ -79,21 +81,25 @@ After deployment completes:
 ## Cloudinary Features You Get:
 
 ### Image Optimization
+
 - Automatic format conversion (WebP for browsers that support it)
 - Automatic quality optimization
 - Responsive image URLs
 
 ### File Management
+
 - Organize files in folders
 - Tag files for easy searching
 - Set expiration dates for temporary files
 
 ### Security
+
 - Signed URLs (optional)
 - Access control
 - Automatic virus scanning (on paid plans)
 
 ### Supported File Types
+
 - ✅ Images: JPG, PNG, GIF, WebP, SVG
 - ✅ Documents: PDF
 - ✅ Videos: MP4, WebM (within limits)
@@ -111,6 +117,7 @@ After deployment completes:
 **This is more than enough for your academic portal!**
 
 If you exceed limits:
+
 - Cloudinary won't charge you automatically
 - You'll get notified to upgrade
 - Your existing files remain accessible
@@ -120,16 +127,19 @@ If you exceed limits:
 ## Troubleshooting
 
 ### "Invalid API credentials"
+
 - Double-check you copied the correct values
 - Make sure no extra spaces in environment variables
 - Verify Cloud Name is correct (case-sensitive)
 
 ### "Upload failed"
+
 - Check file size (max 10MB on free tier per file)
 - Verify file type is supported
 - Check Cloudinary Dashboard for error logs
 
 ### Files not appearing in Media Library
+
 - Wait a few seconds for processing
 - Check the correct folder (default is root)
 - Verify the upload actually succeeded (check API response)
@@ -139,11 +149,13 @@ If you exceed limits:
 ## Upgrade Path (If Needed Later)
 
 **Free Plan:** $0/month
+
 - 25 GB storage
 - 25 GB bandwidth
 - Perfect for development
 
 **Plus Plan:** $89/month (only if you need more)
+
 - 190 GB storage
 - 190 GB bandwidth
 - Advanced features
@@ -156,18 +168,20 @@ If you exceed limits:
 
 **Dashboard:** https://console.cloudinary.com/console  
 **Documentation:** https://cloudinary.com/documentation  
-**Render Dashboard:** https://dashboard.render.com  
+**Render Dashboard:** https://dashboard.render.com
 
 ---
 
 ## Security Best Practices
 
 🔒 **Keep your API Secret secure:**
+
 - Never commit it to GitHub
 - Only store it in Render environment variables
 - Don't share it publicly
 
 🔒 **Use signed URLs for sensitive files** (optional):
+
 - Cloudinary can generate time-limited URLs
 - Prevents unauthorized access
 - Good for private student documents

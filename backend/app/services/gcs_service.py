@@ -319,5 +319,9 @@ class GCSService:
         ]
 
 
-# Singleton instance
-gcs_service = GCSService()
+
+# Only initialize GCSService if all required config is present
+def get_gcs_service():
+    if settings.GCP_PROJECT_ID and settings.GCS_BUCKET_NAME:
+        return GCSService()
+    return None

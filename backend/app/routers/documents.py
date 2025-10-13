@@ -36,10 +36,17 @@ from app.services.gcs_service import gcs_service
 from app.services.cloudinary_service import cloudinary_service
 from app.core.settings import settings
 
+def get_storage_service():
+    if settings.CLOUDINARY_CLOUD_NAME:
+        return cloudinary_service
+    gcs = get_gcs_service()
+    if gcs:
+        return gcs
+    raise RuntimeError("No file storage service configured. Please set up Cloudinary or GCS.")
+
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
-# Determine which storage service to use
-storage_service = cloudinary_service if settings.CLOUDINARY_CLOUD_NAME else gcs_service
+
 
 
 @router.post("/upload-url", response_model=DocumentUploadUrlResponse)
@@ -52,21 +59,27 @@ async def generate_upload_url(
     Generate a presigned URL for uploading a file to GCS.
     
     Access: student, teacher, admin
-    
+from app.services.gcs_service import get_gcs_service
     Process:
     1. Generate unique file path
     2. Create presigned URL for PUT request
     3. Return upload URL with instructions
     
     Client should:
-    1. Call this endpoint to get upload URL
+def get_storage_service():
+    if settings.CLOUDINARY_CLOUD_NAME:
+        return cloudinary_service
+    gcs = get_gcs_service()
+    if gcs:
+        return gcs
+    raise RuntimeError("No file storage service configured. Please set up Cloudinary or GCS.")
     2. Upload file directly to storage (Cloudinary or GCS) using POST/PUT request
     3. Call POST /documents to save metadata
     """
     # Generate unique file path
     file_path = storage_service.generate_file_path(
         category=request.category,
-        user_id=str(current_user.id) if hasattr(storage_service, '__name__') and 'gcs' in storage_service.__name__ else current_user.id,
+            user_id=current_user.id,
         filename=request.filename,
         add_timestamp=True,
     )
@@ -78,7 +91,13 @@ async def generate_upload_url(
     elif request.category == "assignment":
         max_size = 100 * 1024 * 1024  # 100MB for assignments
     
-    # Generate presigned upload URL
+    storage_service = get_storage_service()
+    file_path = storage_service.generate_file_path(
+        category=request.category,
+        user_id=current_user.id,
+        filename=request.filename,
+        add_timestamp=True,
+    )
     upload_data = storage_service.generate_upload_url(
         file_path=file_path,
         content_type=request.content_type,
