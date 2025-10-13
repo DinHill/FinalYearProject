@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
 
 from app.core.database import get_db
-from app.core.security import require_roles, get_current_user
+from app.core.security import require_roles
 from app.core.exceptions import NotFoundError, BusinessLogicError
 from app.models.user import User
 from app.models.finance import Invoice, InvoiceLine, Payment, FeeStructure

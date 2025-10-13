@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
 
 from app.core.database import get_db
-from app.core.security import require_roles, get_current_user
+from app.core.security import require_roles
 from app.core.exceptions import NotFoundError, BusinessLogicError
 from app.models.user import User
 from app.models.document import Document, DocumentRequest, Announcement
@@ -499,7 +499,7 @@ async def list_announcements(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
 ):
     """
     List announcements.
