@@ -21,7 +21,7 @@ class DocumentUploadUrlRequest(BaseSchema):
     category: str = Field(
         ...,
         description="Document category",
-        regex="^(document|transcript|certificate|assignment|avatar|other)$"
+        pattern="^(document|transcript|certificate|assignment|avatar|other)$"
     )
 
 
@@ -46,7 +46,7 @@ class DocumentCreate(BaseSchema):
     category: str = Field(
         ...,
         description="Document category",
-        regex="^(document|transcript|certificate|assignment|avatar|other)$"
+        pattern="^(document|transcript|certificate|assignment|avatar|other)$"
     )
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
@@ -79,7 +79,7 @@ class DocumentRequestCreate(BaseSchema):
     document_type: str = Field(
         ...,
         description="Type of document",
-        regex="^(transcript|certificate|recommendation_letter|enrollment_verification|other)$"
+        pattern="^(transcript|certificate|recommendation_letter|enrollment_verification|other)$"
     )
     purpose: str = Field(..., min_length=1, max_length=500, description="Purpose of request")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
@@ -89,7 +89,7 @@ class DocumentRequestUpdate(BaseSchema):
     """Update document request (admin only)"""
     status: Optional[str] = Field(
         None,
-        regex="^(pending|processing|ready|delivered|cancelled)$"
+        pattern="^(pending|processing|ready|delivered|cancelled)$"
     )
     document_id: Optional[int] = Field(None, description="ID of generated document")
     admin_notes: Optional[str] = Field(None, max_length=1000)
@@ -123,16 +123,16 @@ class AnnouncementCreate(BaseSchema):
     category: str = Field(
         ...,
         description="Announcement category",
-        regex="^(academic|administrative|event|maintenance|other)$"
+        pattern="^(academic|administrative|event|maintenance|other)$"
     )
     target_audience: str = Field(
         ...,
         description="Target audience",
-        regex="^(all|student|teacher|admin)$"
+        pattern="^(all|student|teacher|admin)$"
     )
     priority: Optional[str] = Field(
         "normal",
-        regex="^(low|normal|high|urgent)$"
+        pattern="^(low|normal|high|urgent)$"
     )
     is_published: Optional[bool] = Field(False)
     publish_at: Optional[datetime] = Field(None, description="Scheduled publish time")
@@ -155,3 +155,4 @@ class AnnouncementResponse(BaseSchema):
     
     class Config:
         from_attributes = True
+

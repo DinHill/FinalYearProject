@@ -21,12 +21,12 @@ class SupportTicketCreate(BaseSchema):
     category: str = Field(
         ...,
         description="Ticket category",
-        regex="^(technical|academic|financial|account|other)$"
+        pattern="^(technical|academic|financial|account|other)$"
     )
     priority: str = Field(
         "normal",
         description="Ticket priority",
-        regex="^(low|normal|high|urgent)$"
+        pattern="^(low|normal|high|urgent)$"
     )
 
 
@@ -34,16 +34,16 @@ class SupportTicketUpdate(BaseSchema):
     """Update support ticket (admin only)"""
     status: Optional[str] = Field(
         None,
-        regex="^(open|in_progress|waiting|resolved|closed)$"
+        pattern="^(open|in_progress|waiting|resolved|closed)$"
     )
     priority: Optional[str] = Field(
         None,
-        regex="^(low|normal|high|urgent)$"
+        pattern="^(low|normal|high|urgent)$"
     )
     assigned_to_id: Optional[UUID] = Field(None, description="Assign to user ID")
     category: Optional[str] = Field(
         None,
-        regex="^(technical|academic|financial|account|other)$"
+        pattern="^(technical|academic|financial|account|other)$"
     )
 
 
@@ -81,7 +81,7 @@ class TicketEventCreate(BaseSchema):
     event_type: str = Field(
         "comment",
         description="Event type",
-        regex="^(comment|status_changed|priority_changed|assigned|unassigned|category_changed|created)$"
+        pattern="^(comment|status_changed|priority_changed|assigned|unassigned|category_changed|created)$"
     )
     description: str = Field(..., min_length=1, description="Event description or comment")
 
@@ -107,7 +107,7 @@ class ChatRoomCreate(BaseSchema):
     room_type: str = Field(
         ...,
         description="Room type",
-        regex="^(direct|group|support)$"
+        pattern="^(direct|group|support)$"
     )
     participant_ids: List[UUID] = Field(..., min_items=2, description="Initial participants")
 
@@ -138,3 +138,4 @@ class ChatParticipantResponse(BaseSchema):
 
 # Forward references resolution
 SupportTicketDetailResponse.model_rebuild()
+
