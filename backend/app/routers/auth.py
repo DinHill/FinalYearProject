@@ -1,5 +1,5 @@
 """
-Authentication endpoints
+Authentication endpoints - Admin and Student login
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession

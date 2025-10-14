@@ -2,24 +2,24 @@
 
 A comprehensive academic management system with mobile app, web admin portal, and backend API.
 
+> **📚 For detailed documentation, see [DOCUMENTATION.md](./DOCUMENTATION.md)**
+
 ## 📱 Project Structure
 
 ```
-academic-portal/
+Final Year Project/
 ├── 📱 academic-portal-app/     # React Native Mobile App
-│   ├── src/
-│   ├── assets/
-│   └── package.json
 ├── 🌐 academic-portal-admin/   # Next.js Admin Web Portal
-│   ├── src/
-│   ├── public/
-│   └── package.json
 ├── 🚀 backend/                 # FastAPI Backend API
-│   ├── app/
-│   ├── requirements.txt
-│   └── Dockerfile
-└── 📖 docs/                    # Documentation
+├── 📖 DOCUMENTATION.md         # Complete technical documentation
+└── � README.md               # This file - Quick start guide
 ```
+
+## 🌐 Live Deployment
+
+- **Backend API**: https://academic-portal-api.onrender.com
+- **API Docs**: https://academic-portal-api.onrender.com/docs
+- **Database**: PostgreSQL on Render (26 tables)
 
 ## 🚀 Quick Start
 

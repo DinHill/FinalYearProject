@@ -140,10 +140,19 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
+              <p className="text-sm font-medium text-blue-900 mb-2">⚠️ Database is Empty</p>
               <div className="text-sm text-blue-800 space-y-1">
-                <div><strong>User ID:</strong> admin001</div>
-                <div><strong>Password:</strong> admin123</div>
+                <p>The database has no users yet. To login, you need to:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Run migrations on production database</li>
+                  <li>Create an admin user via API or database</li>
+                  <li>Or use the simpler demo credentials if seeded</li>
+                </ol>
+                <p className="mt-2 font-medium">After seeding, use:</p>
+                <div className="mt-1 pl-2">
+                  <div><strong>Username:</strong> admin</div>
+                  <div><strong>Password:</strong> admin123</div>
+                </div>
               </div>
             </div>
           </CardContent>

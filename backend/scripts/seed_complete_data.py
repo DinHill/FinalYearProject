@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import get_db, engine
 from app.models import (
-    Campus, Major, User, Student, Teacher, Course, 
+    Campus, Major, User, Course, 
     Enrollment, Grade, Invoice, Payment, Document,
     SupportTicket, Announcement
 )
