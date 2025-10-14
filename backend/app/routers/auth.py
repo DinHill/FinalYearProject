@@ -3,11 +3,13 @@ Authentication endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
-from app.core.security import verify_firebase_token
+from app.core.security import verify_firebase_token, SecurityUtils
 from app.core.firebase import FirebaseService
 from app.core.exceptions import AuthenticationError, ValidationError
 from app.services.auth_service import AuthService
+from app.models import User
 from app.schemas.auth import (
     StudentLoginRequest,
     StudentLoginResponse,
@@ -18,7 +20,10 @@ from app.schemas.auth import (
 from app.schemas.base import SuccessResponse
 from pydantic import BaseModel
 from typing import Dict, Any
+from datetime import datetime, timedelta
 import logging
+import jwt
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -55,13 +60,6 @@ async def admin_login(
     Admin/Teacher login endpoint - returns JWT token
     """
     try:
-        from app.core.security import SecurityUtils
-        from app.models import User
-        from sqlalchemy import select
-        import jwt
-        from datetime import datetime, timedelta
-        import os
-        
         # Find user by username
         result = await db.execute(
             select(User).where(User.username == request.user_id)
