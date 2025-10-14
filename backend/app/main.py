@@ -198,6 +198,7 @@ from app.routers import (
     documents_router,
     support_router
 )
+from app.routers.admin_db import router as admin_db_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
@@ -205,6 +206,7 @@ app.include_router(academic_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(support_router, prefix="/api/v1")
+app.include_router(admin_db_router, prefix="/api/v1")
 
 # More routers to be added:
 # from app.routers import analytics
