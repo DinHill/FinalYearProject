@@ -29,6 +29,7 @@ cloudinary==1.41.0
 python-jose[cryptography]==3.3.0
 PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
 python-multipart==0.0.12
 cryptography==43.0.0
 
