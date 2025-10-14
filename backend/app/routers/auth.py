@@ -16,12 +16,110 @@ from app.schemas.auth import (
     ChangePasswordRequest
 )
 from app.schemas.base import SuccessResponse
+from pydantic import BaseModel
 from typing import Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+# Admin login schema
+class AdminLoginRequest(BaseModel):
+    user_id: str
+    password: str
+
+class AdminLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: Dict[str, Any]
+
+
+@router.post(
+    "/admin-login",
+    response_model=AdminLoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Admin/Teacher login with username/password",
+    description="""
+    Simple username/password login for admin portal
+    
+    Returns JWT access token for API authentication
+    """
+)
+async def admin_login(
+    request: AdminLoginRequest,
+    db: AsyncSession = Depends(get_db)
+) -> AdminLoginResponse:
+    """
+    Admin/Teacher login endpoint - returns JWT token
+    """
+    try:
+        from app.core.security import SecurityUtils
+        from app.models import User
+        from sqlalchemy import select
+        import jwt
+        from datetime import datetime, timedelta
+        import os
+        
+        # Find user by username
+        result = await db.execute(
+            select(User).where(User.username == request.user_id)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
+        
+        # Verify password
+        if not user.password_hash or not SecurityUtils.verify_password(request.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
+        
+        # Check if user is admin or teacher
+        if user.role not in ['admin', 'teacher']:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. Admin or teacher role required."
+            )
+        
+        # Generate JWT token
+        secret_key = os.getenv("SECRET_KEY", "your-secret-key-here")
+        token_data = {
+            "sub": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "exp": datetime.utcnow() + timedelta(hours=24)
+        }
+        access_token = jwt.encode(token_data, secret_key, algorithm="HS256")
+        
+        return AdminLoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user={
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role,
+                "status": user.status
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Admin login error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during login"
+        )
 
 
 @router.post(
