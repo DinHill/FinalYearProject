@@ -67,10 +67,10 @@ class User(BaseModel):
     enrollments = relationship("Enrollment", back_populates="student", foreign_keys="[Enrollment.student_id]")
     taught_sections = relationship("CourseSection", back_populates="instructor")
     grades = relationship("Grade", back_populates="student", foreign_keys="[Grade.student_id]")
-    attendance_records = relationship("Attendance", back_populates="student")
-    invoices = relationship("Invoice", back_populates="student")
-    document_requests = relationship("DocumentRequest", back_populates="student")
-    support_tickets = relationship("SupportTicket", back_populates="requester")
+    attendance_records = relationship("Attendance", back_populates="student", foreign_keys="[Attendance.student_id]")
+    invoices = relationship("Invoice", back_populates="student", foreign_keys="[Invoice.student_id]")
+    document_requests = relationship("DocumentRequest", back_populates="student", foreign_keys="[DocumentRequest.student_id]")
+    support_tickets = relationship("SupportTicket", back_populates="requester", foreign_keys="[SupportTicket.requester_id]")
     chat_participations = relationship("ChatParticipant", back_populates="user")
     
     def __repr__(self):
