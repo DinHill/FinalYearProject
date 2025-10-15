@@ -187,13 +187,15 @@ async def run_seed(db: AsyncSession = Depends(get_db)):
         results.append(await seed_campuses(db))
         results.append(await seed_majors(db))
         results.append(await seed_users(db))
-        results.append(await seed_semester(db))
-        results.append(await seed_courses(db))
+        # Semesters and courses tables don't exist in database yet
+        # results.append(await seed_semester(db))
+        # results.append(await seed_courses(db))
         
         return {
             "success": True,
             "message": "Database seeded successfully",
             "results": results,
+            "note": "Only campuses, majors, and users were seeded. Semesters and courses tables don't exist in the database yet.",
             "credentials": {
                 "admin": {"username": "admin", "password": "admin123"},
                 "teacher": {"username": "nguyen.van.a", "password": "teacher123"},
