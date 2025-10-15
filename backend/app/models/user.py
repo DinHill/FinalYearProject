@@ -44,8 +44,8 @@ class User(BaseModel):
     password_hash = Column(String(255))  # For student login flow
     
     # Role & Status
-    role = Column(SQLEnum(UserRole), nullable=False, index=True)
-    status = Column(SQLEnum(UserStatus), default=UserStatus.ACTIVE, index=True)
+    role = Column(String(20), nullable=False, index=True)  # Changed from Enum for compatibility
+    status = Column(String(20), default="active", index=True)  # Changed from Enum for compatibility
     
     # Profile
     phone_number = Column(String(20))
