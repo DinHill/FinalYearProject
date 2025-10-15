@@ -47,15 +47,15 @@ async def seed_campuses(db: AsyncSession) -> Dict:
 async def seed_majors(db: AsyncSession) -> Dict:
     """Seed majors"""
     majors_data = [
-        {"code": "C", "name": "Computer Science", "credits_required": 360,
+        {"code": "C", "name": "Computer Science",
          "description": "Software development, algorithms, and computing systems"},
-        {"code": "B", "name": "Business Administration", "credits_required": 360,
+        {"code": "B", "name": "Business Administration",
          "description": "Management, finance, and business operations"},
-        {"code": "D", "name": "Graphic Design", "credits_required": 360,
+        {"code": "D", "name": "Graphic Design",
          "description": "Visual communication and digital media"},
-        {"code": "IT", "name": "Information Technology", "credits_required": 360,
+        {"code": "IT", "name": "Information Technology",
          "description": "IT infrastructure, networks, and systems administration"},
-        {"code": "MK", "name": "Marketing", "credits_required": 360,
+        {"code": "MK", "name": "Marketing",
          "description": "Digital marketing, branding, and consumer behavior"},
     ]
     
