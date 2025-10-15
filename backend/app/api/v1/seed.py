@@ -20,16 +20,16 @@ async def seed_campuses(db: AsyncSession) -> Dict:
     """Seed campuses"""
     campuses_data = [
         {"code": "H", "name": "Hanoi Campus", "address": "FPT Tower, 10 Pham Van Bach", 
-         "city": "Hanoi", "country": "Vietnam", "phone": "+84 24 7300 5588", 
+         "city": "Hanoi", "phone": "+84 24 7300 5588", 
          "email": "hanoi@greenwich.edu.vn", "is_active": True},
         {"code": "D", "name": "Da Nang Campus", "address": "Lot 30 Quang Trung Software City",
-         "city": "Da Nang", "country": "Vietnam", "phone": "+84 236 3525 688",
+         "city": "Da Nang", "phone": "+84 236 3525 688",
          "email": "danang@greenwich.edu.vn", "is_active": True},
         {"code": "C", "name": "Can Tho Campus", "address": "600A Nguyen Van Cu Noi Dai",
-         "city": "Can Tho", "country": "Vietnam", "phone": "+84 292 3731 279",
+         "city": "Can Tho", "phone": "+84 292 3731 279",
          "email": "cantho@greenwich.edu.vn", "is_active": True},
         {"code": "S", "name": "Ho Chi Minh Campus", "address": "778/B1 Nguyen Kiem Street, Ward 4",
-         "city": "Ho Chi Minh", "country": "Vietnam", "phone": "+84 28 7300 5588",
+         "city": "Ho Chi Minh", "phone": "+84 28 7300 5588",
          "email": "hcm@greenwich.edu.vn", "is_active": True},
     ]
     
