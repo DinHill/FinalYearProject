@@ -66,7 +66,7 @@ class User(BaseModel):
     major = relationship("Major", back_populates="users")
     enrollments = relationship("Enrollment", back_populates="student", foreign_keys="[Enrollment.student_id]")
     taught_sections = relationship("CourseSection", back_populates="instructor")
-    grades = relationship("Grade", back_populates="student")
+    grades = relationship("Grade", back_populates="student", foreign_keys="[Grade.student_id]")
     attendance_records = relationship("Attendance", back_populates="student")
     invoices = relationship("Invoice", back_populates="student")
     document_requests = relationship("DocumentRequest", back_populates="student")
