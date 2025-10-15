@@ -62,9 +62,10 @@ async def verify_firebase_token(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> Dict[str, Any]:
     """
-    Verify Firebase ID token
+    Verify Firebase ID token OR JWT token (for admin login)
     
     This is the main authentication dependency for all API endpoints
+    Supports both Firebase tokens and JWT tokens from admin-login
     
     Usage:
         @app.get("/protected")
@@ -77,7 +78,20 @@ async def verify_firebase_token(
         # Extract token from Authorization header
         token = credentials.credentials
         
-        # Verify token with Firebase (check_revoked=True to ensure token hasn't been revoked)
+        # First, try to decode as JWT token (for admin login)
+        try:
+            decoded_token = SecurityUtils.decode_token(token)
+            # JWT token successfully decoded
+            # Add user info to request state for logging
+            request.state.user_id = decoded_token.get('uid') or decoded_token.get('sub')
+            request.state.user_email = decoded_token.get('email')
+            request.state.user_role = decoded_token.get('role')
+            return decoded_token
+        except:
+            # Not a JWT token, try Firebase token
+            pass
+        
+        # Try to verify as Firebase token
         decoded_token = FirebaseService.verify_id_token(token, check_revoked=True)
         
         # Add user info to request state for logging
@@ -90,7 +104,7 @@ async def verify_firebase_token(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
+            detail=f"Invalid token: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
