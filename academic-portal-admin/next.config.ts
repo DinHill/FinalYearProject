@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'http://localhost:8000/:path*', // Using local backend
+        destination: 'https://academic-portal-api.onrender.com/:path*',
       },
     ];
   },

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AdminSidebar } from './AdminSidebar';
 import { EnhancedTopbar } from './EnhancedTopbar';
 import { ToastContainer } from '@/components/ui/toast';
@@ -19,22 +20,31 @@ const mockUser: AdminUser = {
 };
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const user = mockUser; // Replace with actual user from auth context
 
   const handleSearch = (query: string) => {
-    console.log('Search:', query);
-    // Implement global search functionality
+    // TODO: Implement global search functionality
+    router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
   const handleQuickCreate = (type: string) => {
-    console.log('Quick create:', type);
-    // Implement quick create modals
+    // TODO: Implement quick create modals
+    const routes: Record<string, string> = {
+      user: '/users/new',
+      course: '/academics/courses/new',
+      announcement: '/announcements/new',
+    };
+    if (routes[type]) {
+      router.push(routes[type]);
+    }
   };
 
   const handleLogout = () => {
-    console.log('Logout');
-    // Implement logout functionality
+    // TODO: Implement logout functionality with proper auth
+    localStorage.removeItem('admin_token');
+    router.push('/login');
   };
 
   const handleToggleSidebar = () => {
