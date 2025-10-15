@@ -127,9 +127,10 @@ async def admin_login(
         raise
     except Exception as e:
         logger.error(f"Admin login error: {str(e)}", exc_info=True)
+        # Return the actual error in development to help debug
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during login"
+            detail=f"Login error: {str(e)}"
         )
 
 

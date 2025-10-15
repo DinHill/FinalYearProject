@@ -34,7 +34,8 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Firebase initialized")
     except Exception as e:
         logger.error(f"❌ Firebase initialization failed: {e}")
-        raise
+        logger.warning("⚠️  Continuing without Firebase (admin-login will still work)")
+        # Don't raise - allow app to start without Firebase for local development
     
     # Initialize Database (optional - use Alembic migrations instead)
     # await init_db()
