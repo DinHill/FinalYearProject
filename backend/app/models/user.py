@@ -107,7 +107,7 @@ class Major(BaseModel):
     
     code = Column(String(3), unique=True, nullable=False)  # C, B, D
     name = Column(String(100), nullable=False)
-    degree_type = Column(String(20))  # BSc, BA
+    # degree_type = Column(String(20))  # BSc, BA - Column doesn't exist in database yet
     credits_required = Column(Integer, default=120)
     description = Column(String(1000))
     is_active = Column(Boolean, default=True)
