@@ -51,7 +51,7 @@ class User(BaseModel):
     phone_number = Column(String(20))
     avatar_url = Column(String(500))
     date_of_birth = Column(Date)
-    gender = Column(SQLEnum(Gender))
+    # gender = Column(SQLEnum(Gender))  # Column doesn't exist in database yet
     
     # Academic Context
     campus_id = Column(Integer, ForeignKey("campuses.id"), index=True)
