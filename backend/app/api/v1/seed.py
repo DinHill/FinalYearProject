@@ -308,7 +308,7 @@ async def seed_attendance(db: AsyncSession) -> Dict:
 # FINANCE (4)
 # ============================================
 async def seed_fee_structures(db: AsyncSession) -> Dict:
-    data = [{"code": "UG_FALL2024", "name": "Undergraduate Fall 2024", "tuition_amount": 5000.0, "lab_fee": 200.0, "library_fee": 100.0, "total_amount": 5300.0, "is_active": True}]
+    data = [{"code": "UG_FALL2024", "name": "Undergraduate Fall 2024", "tuition_amount": 5000.0, "lab_fee": 200.0, "library_fee": 100.0, "registration_fee": 0.0, "is_active": True}]
     created = 0
     for d in data:
         q = await db.execute(select(FeeStructure).where(FeeStructure.code==d["code"]))
@@ -328,7 +328,7 @@ async def seed_invoices(db: AsyncSession) -> Dict:
     data = []
     for i, st in enumerate(students):
         inv_num = f"INV-2024-{1000+i}"
-        total = fee.total_amount
+        total = float(fee.tuition_amount + fee.lab_fee + fee.library_fee + fee.registration_fee)
         status = random.choice(["paid","partial","pending"])
         paid = total if status=="paid" else (total*random.uniform(0.2,0.7) if status=="partial" else 0)
         data.append({"student_id": st.id, "semester_id": sem.id, "invoice_number": inv_num, "issue_date": date(2024,8,15), "due_date": date(2024,9,15), "total_amount": total, "paid_amount": round(paid,2), "status": status})
