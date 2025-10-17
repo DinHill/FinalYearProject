@@ -480,8 +480,14 @@ async def seed_document_requests(db: AsyncSession) -> Dict:
 async def seed_announcements(db: AsyncSession) -> Dict:
     campuses = (await db.execute(select(Campus))).scalars().all()
     majors = (await db.execute(select(Major))).scalars().all()
+    # Get an admin or teacher user as author
+    users = (await db.execute(select(User).where(User.role.in_(["admin", "teacher"])))).scalars().all()
+    if not users:
+        return {"entity": "announcements", "created": 0, "total": 0, "message": "No admin/teacher users found"}
+    
     data = [
-        {"title": "Welcome Fall", "body": "Welcome back", "campus_id": campuses[0].id if campuses else None, "category": AnnouncementCategory.ACADEMIC, "priority": Priority.HIGH, "is_published": True, "publish_at": datetime.now()-timedelta(days=10)},
+        {"title": "Welcome Fall Semester 2025", "body": "Welcome back to campus! We hope you had a great break. This semester brings exciting opportunities...", "campus_id": campuses[0].id if campuses else None, "author_id": users[0].id, "category": AnnouncementCategory.ACADEMIC, "priority": Priority.HIGH, "is_published": True, "publish_at": datetime.now()-timedelta(days=10)},
+        {"title": "Library Hours Update", "body": "Starting next week, the library will extend its hours until 10 PM on weekdays.", "campus_id": campuses[0].id if campuses else None, "author_id": users[0].id, "category": AnnouncementCategory.GENERAL, "priority": Priority.NORMAL, "is_published": True, "publish_at": datetime.now()-timedelta(days=5)},
     ]
     created = 0
     for d in data:
