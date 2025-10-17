@@ -274,7 +274,8 @@ async def seed_grades(db: AsyncSession) -> Dict:
     for e in enrollments:
         a_for_sec = [a for a in assignments if a.section_id==e.section_id]
         for a in a_for_sec[:2]:
-            data.append({"assignment_id": a.id, "student_id": e.student_id, "points_earned": random.uniform(50, 95), "submitted_at": datetime.now()-timedelta(days=random.randint(1,10)), "graded_at": datetime.now()-timedelta(days=random.randint(0,5)), "status": GradeStatus.GRADED})
+            points = random.uniform(50, 95)
+            data.append({"assignment_id": a.id, "student_id": e.student_id, "points_earned": points, "max_points": a.max_points, "percentage": round((points / float(a.max_points)) * 100, 2), "submitted_at": datetime.now()-timedelta(days=random.randint(1,10)), "graded_at": datetime.now()-timedelta(days=random.randint(0,5)), "status": GradeStatus.GRADED})
     created = 0
     for d in data:
         q = await db.execute(select(Grade).where(Grade.assignment_id==d["assignment_id"], Grade.student_id==d["student_id"]))
