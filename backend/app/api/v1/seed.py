@@ -15,8 +15,11 @@ from app.models.academic import (
     Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance,
     SemesterType, AssignmentType, AttendanceStatus, GradeStatus, EnrollmentStatus
 )
-from app.models.finance import FeeStructure, Invoice, InvoiceLine, Payment
-from app.models.communication import ChatRoom, ChatParticipant, SupportTicket, TicketEvent
+from app.models.finance import FeeStructure, Invoice, InvoiceLine, Payment, PaymentMethod, PaymentStatus
+from app.models.communication import (
+    ChatRoom, ChatParticipant, SupportTicket, TicketEvent,
+    RoomType, ParticipantRole, TicketCategory, TicketPriority, TicketStatus, EventType
+)
 from app.models.document import (
     Document, DocumentRequest, Announcement,
     DocumentCategory, DocumentVisibility, DocumentRequestType, DocumentRequestStatus, DeliveryMethod,
@@ -363,7 +366,7 @@ async def seed_payments(db: AsyncSession) -> Dict:
     invoices = (await db.execute(select(Invoice).where(Invoice.status.in_(["paid","partial"])))).scalars().all()
     data = []
     for i, inv in enumerate(invoices):
-        data.append({"invoice_id": inv.id, "amount": inv.paid_amount, "payment_method": random.choice(["bank_transfer","credit_card"]), "reference_number": f"PAY-{2000+i}", "paid_at": datetime.now()-timedelta(days=random.randint(1,30)), "status": "completed"})
+        data.append({"invoice_id": inv.id, "amount": inv.paid_amount, "payment_method": random.choice([PaymentMethod.BANK_TRANSFER, PaymentMethod.CREDIT_CARD]), "reference_number": f"PAY-{2000+i}", "paid_at": datetime.now()-timedelta(days=random.randint(1,30)), "status": PaymentStatus.COMPLETED})
     created = 0
     for d in data:
         q = await db.execute(select(Payment).where(Payment.reference_number==d["reference_number"]))
@@ -382,9 +385,9 @@ async def seed_chat_rooms(db: AsyncSession) -> Dict:
     campuses = (await db.execute(select(Campus))).scalars().all()
     data = []
     for s in sections[:4]:
-        data.append({"firebase_room_id": f"course_{s.id}", "name": f"Course {s.id}", "type": "course", "section_id": s.id, "is_active": True})
+        data.append({"firebase_room_id": f"course_{s.id}", "name": f"Course {s.id}", "type": RoomType.COURSE, "section_id": s.id, "is_active": True})
     for c in campuses[:2]:
-        data.append({"firebase_room_id": f"campus_{c.id}", "name": f"{c.name} - General", "type": "campus", "campus_id": c.id, "is_active": True})
+        data.append({"firebase_room_id": f"campus_{c.id}", "name": f"{c.name} - General", "type": RoomType.GROUP, "campus_id": c.id, "is_active": True})
     created = 0
     for d in data:
         q = await db.execute(select(ChatRoom).where(ChatRoom.firebase_room_id==d["firebase_room_id"]))
@@ -401,7 +404,7 @@ async def seed_chat_participants(db: AsyncSession) -> Dict:
     data = []
     for r in rooms:
         for u in users[:5]:
-            data.append({"room_id": r.id, "user_id": u.id, "role": "member", "joined_at": datetime.now()-timedelta(days=random.randint(1,60))})
+            data.append({"room_id": r.id, "user_id": u.id, "role": ParticipantRole.MEMBER, "joined_at": datetime.now()-timedelta(days=random.randint(1,60))})
     created = 0
     for d in data:
         q = await db.execute(select(ChatParticipant).where(ChatParticipant.room_id==d["room_id"], ChatParticipant.user_id==d["user_id"]))
@@ -417,7 +420,7 @@ async def seed_support_tickets(db: AsyncSession) -> Dict:
     admin = (await db.execute(select(User).where(User.role=="admin"))).scalar_one_or_none()
     data = []
     for i, st in enumerate(students[:4]):
-        data.append({"ticket_number": f"TKT-{1000+i}", "requester_id": st.id, "assigned_to": admin.id if admin else None, "subject": "Help needed", "description": "Issue", "category": "general", "priority": "medium", "status": "open"})
+        data.append({"ticket_number": f"TKT-{1000+i}", "requester_id": st.id, "assigned_to": admin.id if admin else None, "subject": "Help needed", "description": "Issue", "category": TicketCategory.OTHER, "priority": TicketPriority.NORMAL, "status": TicketStatus.OPEN})
     created = 0
     for d in data:
         q = await db.execute(select(SupportTicket).where(SupportTicket.ticket_number==d["ticket_number"]))
@@ -432,7 +435,7 @@ async def seed_ticket_events(db: AsyncSession) -> Dict:
     tickets = (await db.execute(select(SupportTicket))).scalars().all()
     data = []
     for t in tickets:
-        data.append({"ticket_id": t.id, "event_type": "created", "description": "Created", "created_at": datetime.now()-timedelta(days=random.randint(1,20))})
+        data.append({"ticket_id": t.id, "event_type": EventType.CREATED, "description": "Created"})
     created = 0
     for d in data:
         db.add(TicketEvent(**d))
