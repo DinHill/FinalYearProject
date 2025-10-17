@@ -487,7 +487,7 @@ async def seed_announcements(db: AsyncSession) -> Dict:
     
     data = [
         {"title": "Welcome Fall Semester 2025", "body": "Welcome back to campus! We hope you had a great break. This semester brings exciting opportunities...", "campus_id": campuses[0].id if campuses else None, "author_id": users[0].id, "category": AnnouncementCategory.ACADEMIC, "priority": Priority.HIGH, "is_published": True, "publish_at": datetime.now()-timedelta(days=10)},
-        {"title": "Library Hours Update", "body": "Starting next week, the library will extend its hours until 10 PM on weekdays.", "campus_id": campuses[0].id if campuses else None, "author_id": users[0].id, "category": AnnouncementCategory.GENERAL, "priority": Priority.NORMAL, "is_published": True, "publish_at": datetime.now()-timedelta(days=5)},
+        {"title": "Library Hours Update", "body": "Starting next week, the library will extend its hours until 10 PM on weekdays.", "campus_id": campuses[0].id if campuses else None, "author_id": users[0].id, "category": AnnouncementCategory.NEWS, "priority": Priority.NORMAL, "is_published": True, "publish_at": datetime.now()-timedelta(days=5)},
     ]
     created = 0
     for d in data:
