@@ -205,7 +205,7 @@ async def seed_course_sections(db: AsyncSession) -> Dict:
 
 async def seed_schedules(db: AsyncSession) -> Dict:
     sections = (await db.execute(select(CourseSection))).scalars().all()
-    days = ["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY"]
+    days = [1, 2, 3, 4, 5]  # 1=Monday through 5=Friday
     times = [("08:00","10:00"),("10:00","12:00"),("13:00","15:00")]
     data = []
     for i, s in enumerate(sections):
