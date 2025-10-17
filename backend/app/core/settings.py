@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     SENDGRID_FROM_NAME: str = "Greenwich University"
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:19006"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:19006,https://academic-portal-admin.vercel.app"
     CORS_ALLOW_CREDENTIALS: bool = True
     
     @property
