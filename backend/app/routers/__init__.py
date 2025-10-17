@@ -7,6 +7,7 @@ from app.routers.academic import router as academic_router
 from app.routers.finance import router as finance_router
 from app.routers.documents import router as documents_router
 from app.routers.support import router as support_router
+from app.routers.dashboard import router as dashboard_router
 
 __all__ = [
     "auth_router",
@@ -15,4 +16,5 @@ __all__ = [
     "finance_router",
     "documents_router",
     "support_router",
+    "dashboard_router",
 ]
