@@ -5,16 +5,23 @@ Run this from the deployed backend on Render
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
 from typing import Dict
 import random
 
 from app.core.database import get_db
 from app.models.user import User, Campus, Major, UsernameSequence, StudentSequence, DeviceToken
-from app.models.academic import Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance
+from app.models.academic import (
+    Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance,
+    SemesterType, AssignmentType, AttendanceStatus, GradeStatus, EnrollmentStatus
+)
 from app.models.finance import FeeStructure, Invoice, InvoiceLine, Payment
 from app.models.communication import ChatRoom, ChatParticipant, SupportTicket, TicketEvent
-from app.models.document import Document, DocumentRequest, Announcement
+from app.models.document import (
+    Document, DocumentRequest, Announcement,
+    DocumentCategory, DocumentVisibility, DocumentRequestType, DocumentRequestStatus, DeliveryMethod,
+    AnnouncementCategory, Priority
+)
 from app.core.security import SecurityUtils
 
 router = APIRouter(prefix="/api/v1/seed", tags=["seed"])
@@ -152,8 +159,8 @@ async def seed_device_tokens(db: AsyncSession) -> Dict:
 # ============================================
 async def seed_semesters(db: AsyncSession) -> Dict:
     data = [
-        {"code": "FALL2024", "name": "Fall 2024", "type": "FALL", "academic_year": 2024, "start_date": date(2024,9,1), "end_date": date(2024,12,20), "is_current": True},
-        {"code": "SPRING2025", "name": "Spring 2025", "type": "SPRING", "academic_year": 2025, "start_date": date(2025,1,6), "end_date": date(2025,5,15), "is_current": False},
+        {"code": "FALL2024", "name": "Fall 2024", "type": SemesterType.FALL, "academic_year": 2024, "start_date": date(2024,9,1), "end_date": date(2024,12,20), "is_current": True},
+        {"code": "SPRING2025", "name": "Spring 2025", "type": SemesterType.SPRING, "academic_year": 2025, "start_date": date(2025,1,6), "end_date": date(2025,5,15), "is_current": False},
     ]
     created = 0
     for s in data:
@@ -206,7 +213,7 @@ async def seed_course_sections(db: AsyncSession) -> Dict:
 async def seed_schedules(db: AsyncSession) -> Dict:
     sections = (await db.execute(select(CourseSection))).scalars().all()
     days = [1, 2, 3, 4, 5]  # 1=Monday through 5=Friday
-    times = [("08:00","10:00"),("10:00","12:00"),("13:00","15:00")]
+    times = [(time(8,0), time(10,0)), (time(10,0), time(12,0)), (time(13,0), time(15,0))]
     data = []
     for i, s in enumerate(sections):
         day = days[i%len(days)]
@@ -229,7 +236,7 @@ async def seed_enrollments(db: AsyncSession) -> Dict:
     for st in students:
         chosen = random.sample(sections, min(3, len(sections))) if sections else []
         for sec in chosen:
-            data.append({"student_id": st.id, "section_id": sec.id, "status": "enrolled", "enrolled_at": datetime.now() - timedelta(days=random.randint(10,50))})
+            data.append({"student_id": st.id, "section_id": sec.id, "status": EnrollmentStatus.ENROLLED, "enrolled_at": datetime.now() - timedelta(days=random.randint(10,50))})
     created = 0
     for d in data:
         q = await db.execute(select(Enrollment).where(Enrollment.student_id==d["student_id"], Enrollment.section_id==d["section_id"]))
@@ -250,7 +257,8 @@ async def seed_assignments(db: AsyncSession) -> Dict:
     data = []
     for s in sections:
         for i in range(3):
-            data.append({"section_id": s.id, "title": f"HW {i+1}", "description": "Do this", "type": "HOMEWORK", "max_points": 100, "weight_percent": 10, "due_date": date.today()+timedelta(days=7*(i+1)), "is_published": True})
+            due_dt = datetime.combine(date.today() + timedelta(days=7*(i+1)), datetime.min.time())
+            data.append({"section_id": s.id, "title": f"HW {i+1}", "description": "Do this", "type": AssignmentType.HOMEWORK, "max_points": 100, "weight_percent": 10, "due_date": due_dt, "is_published": True})
     created = 0
     for d in data:
         db.add(Assignment(**d))
@@ -266,7 +274,7 @@ async def seed_grades(db: AsyncSession) -> Dict:
     for e in enrollments:
         a_for_sec = [a for a in assignments if a.section_id==e.section_id]
         for a in a_for_sec[:2]:
-            data.append({"assignment_id": a.id, "student_id": e.student_id, "points_earned": random.uniform(50, 95), "submitted_at": datetime.now()-timedelta(days=random.randint(1,10)), "graded_at": datetime.now()-timedelta(days=random.randint(0,5)), "status": "graded"})
+            data.append({"assignment_id": a.id, "student_id": e.student_id, "points_earned": random.uniform(50, 95), "submitted_at": datetime.now()-timedelta(days=random.randint(1,10)), "graded_at": datetime.now()-timedelta(days=random.randint(0,5)), "status": GradeStatus.GRADED})
     created = 0
     for d in data:
         q = await db.execute(select(Grade).where(Grade.assignment_id==d["assignment_id"], Grade.student_id==d["student_id"]))
@@ -283,7 +291,8 @@ async def seed_attendance(db: AsyncSession) -> Dict:
     for week in range(4):
         dt = date.today() - timedelta(days=7*week)
         for e in enrollments:
-            data.append({"section_id": e.section_id, "student_id": e.student_id, "attendance_date": dt, "status": random.choice(["present"]*9+["absent"]), "notes": None})
+            status_val = AttendanceStatus.PRESENT if random.random() < 0.9 else AttendanceStatus.ABSENT
+            data.append({"section_id": e.section_id, "student_id": e.student_id, "attendance_date": dt, "status": status_val, "notes": None})
     created = 0
     for d in data:
         q = await db.execute(select(Attendance).where(Attendance.section_id==d["section_id"], Attendance.student_id==d["student_id"], Attendance.attendance_date==d["attendance_date"]))
@@ -440,7 +449,7 @@ async def seed_documents(db: AsyncSession) -> Dict:
     data = []
     for i, s in enumerate(sections[:4]):
         teacher = teachers[i%len(teachers)] if teachers else None
-        data.append({"owner_id": teacher.id if teacher else None, "section_id": s.id, "title": "Syllabus", "file_path": f"/docs/syllabus_{s.id}.pdf", "mime_type": "application/pdf", "file_size": 102400, "category": "SYLLABUS", "visibility": "section", "file_hash": f"h_{s.id}"})
+        data.append({"owner_id": teacher.id if teacher else None, "section_id": s.id, "title": "Syllabus", "file_path": f"/docs/syllabus_{s.id}.pdf", "mime_type": "application/pdf", "file_size": 102400, "category": DocumentCategory.SYLLABUS, "visibility": DocumentVisibility.RESTRICTED, "file_hash": f"h_{s.id}"})
     created = 0
     for d in data:
         q = await db.execute(select(Document).where(Document.file_hash==d["file_hash"]))
@@ -455,7 +464,7 @@ async def seed_document_requests(db: AsyncSession) -> Dict:
     students = (await db.execute(select(User).where(User.role=="student"))).scalars().all()
     data = []
     for i, s in enumerate(students[:3]):
-        data.append({"student_id": s.id, "document_type": "TRANSCRIPT", "purpose": "Job", "status": "pending", "delivery_method": "pickup"})
+        data.append({"student_id": s.id, "document_type": DocumentRequestType.TRANSCRIPT, "purpose": "Job", "status": DocumentRequestStatus.PENDING, "delivery_method": DeliveryMethod.PICKUP})
     created = 0
     for d in data:
         db.add(DocumentRequest(**d))
@@ -468,7 +477,7 @@ async def seed_announcements(db: AsyncSession) -> Dict:
     campuses = (await db.execute(select(Campus))).scalars().all()
     majors = (await db.execute(select(Major))).scalars().all()
     data = [
-        {"title": "Welcome Fall", "body": "Welcome back", "campus_id": campuses[0].id if campuses else None, "category": "ACADEMIC", "priority": "high", "is_published": True, "publish_at": datetime.now()-timedelta(days=10)},
+        {"title": "Welcome Fall", "body": "Welcome back", "campus_id": campuses[0].id if campuses else None, "category": AnnouncementCategory.ACADEMIC, "priority": Priority.HIGH, "is_published": True, "publish_at": datetime.now()-timedelta(days=10)},
     ]
     created = 0
     for d in data:
