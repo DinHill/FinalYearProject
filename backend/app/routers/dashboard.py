@@ -68,11 +68,11 @@ async def get_dashboard_stats(
     # Attendance statistics (last 30 days)
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     total_attendance_query = select(func.count(Attendance.id)).where(
-        Attendance.date >= thirty_days_ago
+        Attendance.attendance_date >= thirty_days_ago
     )
     present_attendance_query = select(func.count(Attendance.id)).where(
         and_(
-            Attendance.date >= thirty_days_ago,
+            Attendance.attendance_date >= thirty_days_ago,
             Attendance.status == AttendanceStatus.PRESENT
         )
     )
