@@ -23,10 +23,13 @@ export default function Dashboard() {
     setError(null);
 
     try {
-      const [statsResult, activityResult] = await Promise.all([
-        api.getDashboardStats(),
-        api.getRecentActivity(10)
-      ]);
+      // Temporarily only load stats to debug the issue
+      const statsResult = await api.getDashboardStats();
+      
+      // const [statsResult, activityResult] = await Promise.all([
+      //   api.getDashboardStats(),
+      //   api.getRecentActivity(10)
+      // ]);
 
       if (statsResult.success && statsResult.data) {
         setStats(statsResult.data);
@@ -34,9 +37,9 @@ export default function Dashboard() {
         setError(statsResult.error || 'Failed to load statistics');
       }
 
-      if (activityResult.success && activityResult.data) {
-        setRecentActivity(activityResult.data);
-      }
+      // if (activityResult.success && activityResult.data) {
+      //   setRecentActivity(activityResult.data);
+      // }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
     } finally {
