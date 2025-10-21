@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from app.core.database import get_db
-from app.core.security import verify_firebase_token, require_roles
+from app.core.security import verify_firebase_token
+from app.core.rbac import require_roles, require_admin, get_user_campus_access, check_campus_access, require_teacher_or_admin
 from app.core.firebase import FirebaseService
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models import User, Campus, Major
@@ -33,7 +34,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 )
 async def create_user(
     user_data: UserCreate,
-    current_user: Dict[str, Any] = Depends(require_roles(["admin"])),
+    current_user: Dict[str, Any] = Depends(require_admin()),
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """
@@ -178,7 +179,7 @@ async def create_user(
     response_model=PaginatedResponse,
     status_code=status.HTTP_200_OK,
     summary="List users",
-    description="Get paginated list of users with optional filters"
+    description="Get paginated list of users with optional filters (campus-filtered)"
 )
 async def list_users(
     pagination: PaginationParams = Depends(),
@@ -187,24 +188,25 @@ async def list_users(
     major_id: Optional[int] = Query(None, description="Filter by major"),
     status: Optional[str] = Query(None, description="Filter by status"),
     search: Optional[str] = Query(None, description="Search by name, username, or email"),
-    current_user: Dict[str, Any] = Depends(require_roles(["admin", "teacher"])),
+    current_user: Dict[str, Any] = Depends(require_teacher_or_admin()),
     db: AsyncSession = Depends(get_db)
 ) -> PaginatedResponse:
     """
-    List users with filters and pagination
+    List users with filters and pagination (campus-filtered)
     
-    **Admin and Teacher access**
+    **Admin and Teacher access - see only users within their campus scope**
     """
     try:
         # Build query
         query = select(User)
         
+        # Apply campus filtering
+        user_campus_access = await get_user_campus_access(current_user, db)
+        
         # Apply filters
         conditions = []
         if role:
             conditions.append(User.role == role)
-        if campus_id:
-            conditions.append(User.campus_id == campus_id)
         if major_id:
             conditions.append(User.major_id == major_id)
         if status:
@@ -218,6 +220,29 @@ async def list_users(
                     User.email.ilike(search_term)
                 )
             )
+        
+        # Handle campus filtering
+        if campus_id:
+            # Specific campus requested - verify access
+            if user_campus_access is not None:
+                await check_campus_access(current_user, campus_id, db, raise_error=True)
+            conditions.append(User.campus_id == campus_id)
+        else:
+            # No specific campus - filter by user's campus access
+            if user_campus_access is not None:  # Campus-scoped user
+                if user_campus_access:
+                    conditions.append(User.campus_id.in_(user_campus_access))
+                else:
+                    # No campus assignments - return empty
+                    return PaginatedResponse(
+                        data=[],
+                        pagination={
+                            "page": pagination.page,
+                            "page_size": pagination.page_size,
+                            "total": 0,
+                            "total_pages": 0
+                        }
+                    )
         
         if conditions:
             query = query.where(and_(*conditions))
@@ -320,7 +345,7 @@ async def get_user(
 async def update_user(
     user_id: int,
     user_data: UserUpdate,
-    current_user: Dict[str, Any] = Depends(require_roles(["admin"])),
+    current_user: Dict[str, Any] = Depends(require_admin()),
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """Update user"""
@@ -365,7 +390,7 @@ async def update_user(
 )
 async def delete_user(
     user_id: int,
-    current_user: Dict[str, Any] = Depends(require_roles(["admin"])),
+    current_user: Dict[str, Any] = Depends(require_admin()),
     db: AsyncSession = Depends(get_db)
 ) -> SuccessResponse:
     """Soft delete user"""

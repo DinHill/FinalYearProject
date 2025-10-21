@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.rbac import require_roles, require_admin, require_student, get_user_campus_access, check_campus_access
 from app.core.exceptions import NotFoundError, BusinessLogicError
 from app.models.user import User
 from app.models.document import Document, DocumentRequest, Announcement
@@ -53,7 +53,7 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 async def generate_upload_url(
     request: DocumentUploadUrlRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Generate a presigned URL for uploading a file to GCS.
@@ -125,7 +125,7 @@ def get_storage_service():
 async def create_document(
     document_data: DocumentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Create document metadata after successful file upload.
@@ -171,22 +171,28 @@ async def create_document(
 async def list_documents(
     category: Optional[str] = Query(None, description="Filter by category"),
     uploader_id: Optional[UUID] = Query(None, description="Filter by uploader ID"),
+    campus_id: Optional[int] = Query(None, description="Filter by campus"),
     is_public: Optional[bool] = Query(None, description="Filter by public status"),
     search: Optional[str] = Query(None, description="Search in title/description"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
-    List documents with filters.
+    List documents with filters (campus-filtered).
     
     Access:
-    - Admins can see all documents
-    - Teachers can see public documents and their own
-    - Students can see public documents and their own
+    - Admins can see documents within their campus scope
+    - Teachers can see public documents and their own (within campus)
+    - Students can see public documents and their own (within campus)
     """
     query = select(Document)
+    
+    # Get user's campus access
+    user_campus_access = await get_user_campus_access(
+        {"uid": str(current_user.id), "roles": [current_user.role]}, db
+    )
     
     # Role-based filtering
     if current_user.role in ["student", "teacher"]:
@@ -197,6 +203,30 @@ async def list_documents(
                 Document.uploader_id == current_user.id
             )
         )
+    
+    # Campus filtering
+    if campus_id:
+        # Specific campus requested - verify access
+        if user_campus_access is not None:
+            await check_campus_access(
+                {"uid": str(current_user.id), "roles": [current_user.role]}, 
+                campus_id, db, raise_error=True
+            )
+        query = query.where(Document.campus_id == campus_id)
+    else:
+        # No specific campus - filter by user's campus access
+        if user_campus_access is not None:  # Campus-scoped user
+            if user_campus_access:
+                query = query.where(Document.campus_id.in_(user_campus_access))
+            else:
+                # No campus assignments - return empty
+                return PaginatedResponse(
+                    items=[],
+                    total=0,
+                    page=page,
+                    page_size=page_size,
+                    pages=0
+                )
     
     if category:
         query = query.where(Document.category == category)
@@ -243,7 +273,7 @@ async def generate_download_url(
     document_id: int,
     disposition: str = Query("inline", regex="^(inline|attachment)$"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Generate a presigned URL for downloading a document.
@@ -297,7 +327,7 @@ async def generate_download_url(
 async def delete_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "student", "teacher"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Delete a document (metadata and file).
@@ -339,7 +369,7 @@ async def delete_document(
 async def create_document_request(
     request_data: DocumentRequestCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student"]))
+    current_user: User = Depends(require_student())
 ):
     """
     Request an official document (transcript, certificate, etc.).
@@ -376,7 +406,7 @@ async def list_document_requests(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "admin", "document_admin"]))
+    current_user: User = Depends(require_roles("student", "super_admin", "support_admin"))
 ):
     """
     List document requests.
@@ -425,7 +455,7 @@ async def update_document_request(
     request_id: int,
     update_data: DocumentRequestUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "document_admin"]))
+    current_user: User = Depends(require_roles("super_admin", "support_admin"))
 ):
     """
     Update document request status.
@@ -471,7 +501,7 @@ async def update_document_request(
 async def create_announcement(
     announcement_data: AnnouncementCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_admin())
 ):
     """
     Create a new announcement.
@@ -505,7 +535,7 @@ async def list_announcements(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     List announcements.

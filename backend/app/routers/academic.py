@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from app.core.database import get_db
-from app.core.security import verify_firebase_token, require_roles
+from app.core.security import verify_firebase_token
+from app.core.rbac import require_roles, require_admin, require_teacher_or_admin, get_user_campus_access, check_campus_access
 from app.core.exceptions import ValidationError, NotFoundError
 from app.models import (
     Course, CourseSection, Enrollment, Assignment, Grade, Attendance,
@@ -39,7 +40,7 @@ router = APIRouter(prefix="/academic", tags=["Academic"])
 @router.post("/courses", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 async def create_course(
     course_data: CourseCreate,
-    current_user: Dict[str, Any] = Depends(require_roles(["admin"])),
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "academic_admin")),
     db: AsyncSession = Depends(get_db)
 ) -> CourseResponse:
     """Create new course (admin only)"""
@@ -96,13 +97,20 @@ async def list_courses(
     
     # Paginate
     query = query.offset((pagination.page - 1) * pagination.page_size).limit(pagination.page_size)
-    query = query.order_by(Course.code)
+    query = query.order_by(Course.course_code)
     
     result = await db.execute(query)
     courses = result.scalars().all()
     
+    # Convert to response - map course_code to code
+    course_responses = []
+    for c in courses:
+        course_dict = c.__dict__.copy()
+        course_dict['code'] = course_dict.pop('course_code')
+        course_responses.append(CourseResponse(**course_dict))
+    
     return PaginatedResponse(
-        data=[CourseResponse(**c.__dict__) for c in courses],
+        data=course_responses,
         pagination={
             "page": pagination.page,
             "page_size": pagination.page_size,
@@ -119,10 +127,10 @@ async def list_courses(
 @router.post("/sections", response_model=CourseSectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_section(
     section_data: CourseSectionCreate,
-    current_user: Dict[str, Any] = Depends(require_roles(["admin"])),
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "academic_admin")),
     db: AsyncSession = Depends(get_db)
 ) -> CourseSectionResponse:
-    """Create course section (admin only)"""
+    """Create course section (admin only, campus-filtered)"""
     # Verify course, semester, teacher exist
     course = await db.get(Course, section_data.course_id)
     semester = await db.get(Semester, section_data.semester_id)
@@ -134,6 +142,10 @@ async def create_section(
         raise HTTPException(status_code=400, detail="Semester not found")
     if not teacher or teacher.role != "teacher":
         raise HTTPException(status_code=400, detail="Invalid teacher")
+    
+    # Check campus access if section has campus_id
+    if section_data.campus_id:
+        await check_campus_access(current_user, section_data.campus_id, db, raise_error=True)
     
     section = CourseSection(**section_data.model_dump())
     db.add(section)
@@ -157,9 +169,10 @@ async def list_sections(
     course_id: Optional[int] = Query(None),
     campus_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
+    current_user: Dict[str, Any] = Depends(verify_firebase_token),
     db: AsyncSession = Depends(get_db)
 ) -> PaginatedResponse:
-    """List course sections with filters"""
+    """List course sections with filters (campus-filtered)"""
     query = select(CourseSection)
     
     conditions = []
@@ -167,10 +180,33 @@ async def list_sections(
         conditions.append(CourseSection.semester_id == semester_id)
     if course_id:
         conditions.append(CourseSection.course_id == course_id)
-    if campus_id:
-        conditions.append(CourseSection.campus_id == campus_id)
     if status:
         conditions.append(CourseSection.status == status)
+    
+    # Apply campus filtering based on user access
+    user_campus_access = await get_user_campus_access(current_user, db)
+    
+    if campus_id:
+        # User requested specific campus - verify they have access
+        if user_campus_access is not None:  # Not cross-campus access
+            await check_campus_access(current_user, campus_id, db, raise_error=True)
+        conditions.append(CourseSection.campus_id == campus_id)
+    else:
+        # No specific campus requested - filter by user's campus access
+        if user_campus_access is not None:  # Campus-scoped user
+            if user_campus_access:  # Has campus assignments
+                conditions.append(CourseSection.campus_id.in_(user_campus_access))
+            else:
+                # User has no campus assignments - return empty result
+                return PaginatedResponse(
+                    data=[],
+                    pagination={
+                        "page": pagination.page,
+                        "page_size": pagination.page_size,
+                        "total": 0,
+                        "total_pages": 0
+                    }
+                )
     
     if conditions:
         query = query.where(and_(*conditions))
@@ -219,16 +255,25 @@ async def enroll_in_section(
     db: AsyncSession = Depends(get_db)
 ) -> EnrollmentResponse:
     """
-    Enroll in course section
+    Enroll in course section (campus-verified)
     
     Students can enroll themselves
-    Validates: capacity, schedule conflicts, prerequisites
+    Validates: capacity, schedule conflicts, prerequisites, campus access
     """
     try:
         # Get student ID from token
         student_id = current_user.get('db_user_id')
         if not student_id:
             raise HTTPException(status_code=400, detail="Invalid user token")
+        
+        # Get section and verify campus access
+        section = await db.get(CourseSection, enrollment_data.section_id)
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+        
+        # Verify student has access to the section's campus
+        if section.campus_id:
+            await check_campus_access(current_user, section.campus_id, db, raise_error=True)
         
         # Enroll
         enrollment = await EnrollmentService.enroll_student(
@@ -239,6 +284,82 @@ async def enroll_in_section(
         
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/enrollments", response_model=PaginatedResponse)
+async def list_enrollments(
+    pagination: PaginationParams = Depends(),
+    section_id: Optional[int] = Query(None),
+    student_id: Optional[int] = Query(None),
+    semester_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    campus_id: Optional[int] = Query(None),
+    current_user: Dict[str, Any] = Depends(require_teacher_or_admin()),
+    db: AsyncSession = Depends(get_db)
+) -> PaginatedResponse:
+    """List enrollments with filters (teachers and admins only, campus-filtered)"""
+    query = select(Enrollment).join(CourseSection, Enrollment.section_id == CourseSection.id)
+    
+    conditions = []
+    if section_id:
+        conditions.append(Enrollment.section_id == section_id)
+    if student_id:
+        conditions.append(Enrollment.student_id == student_id)
+    if status:
+        conditions.append(Enrollment.status == status)
+    
+    # Apply semester filter if provided
+    if semester_id:
+        conditions.append(CourseSection.semester_id == semester_id)
+    
+    # Apply campus filtering based on user access
+    user_campus_access = await get_user_campus_access(current_user, db)
+    
+    if campus_id:
+        # User requested specific campus - verify they have access
+        if user_campus_access is not None:  # Not cross-campus access
+            await check_campus_access(current_user, campus_id, db, raise_error=True)
+        conditions.append(CourseSection.campus_id == campus_id)
+    else:
+        # No specific campus requested - filter by user's campus access
+        if user_campus_access is not None:  # Campus-scoped user
+            if user_campus_access:  # Has campus assignments
+                conditions.append(CourseSection.campus_id.in_(user_campus_access))
+            else:
+                # User has no campus assignments - return empty result
+                return PaginatedResponse(
+                    data=[],
+                    pagination={
+                        "page": pagination.page,
+                        "page_size": pagination.page_size,
+                        "total": 0,
+                        "total_pages": 0
+                    }
+                )
+    
+    if conditions:
+        query = query.where(and_(*conditions))
+    
+    # Get total count
+    total_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(total_query)
+    total = total_result.scalar()
+    
+    # Apply pagination
+    query = query.offset((pagination.page - 1) * pagination.page_size).limit(pagination.page_size)
+    
+    result = await db.execute(query)
+    enrollments = result.scalars().all()
+    
+    return PaginatedResponse(
+        data=[EnrollmentResponse(**enrollment.__dict__) for enrollment in enrollments],
+        pagination={
+            "page": pagination.page,
+            "page_size": pagination.page_size,
+            "total": total,
+            "total_pages": (total + pagination.page_size - 1) // pagination.page_size
+        }
+    )
 
 
 @router.get("/enrollments/my", response_model=List[EnrollmentWithCourseResponse])
@@ -260,11 +381,11 @@ async def get_my_enrollments(
         section = await db.get(CourseSection, enrollment.section_id)
         course = await db.get(Course, section.course_id)
         semester = await db.get(Semester, section.semester_id)
-        teacher = await db.get(User, section.teacher_id)
+        teacher = await db.get(User, section.instructor_id)  # Fixed: instructor_id not teacher_id
         
         response_data = enrollment.__dict__.copy()
         response_data.update({
-            "course_code": course.code,
+            "course_code": course.course_code,  # Fixed: course_code not code
             "course_name": course.name,
             "section_number": section.section_number,
             "teacher_name": teacher.full_name,
@@ -305,14 +426,24 @@ async def drop_enrollment(
 async def submit_grade(
     assignment_id: int,
     grade_data: GradeCreate,
-    current_user: Dict[str, Any] = Depends(require_roles(["teacher", "admin"])),
+    current_user: Dict[str, Any] = Depends(require_teacher_or_admin()),
     db: AsyncSession = Depends(get_db)
 ) -> GradeResponse:
-    """Submit/update grade for student (teacher only)"""
+    """Submit/update grade for student (teacher only, campus-verified)"""
     # Verify assignment exists
     assignment = await db.get(Assignment, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Get section and verify campus access
+    section = await db.get(CourseSection, assignment.section_id)
+    if section and section.campus_id:
+        await check_campus_access(current_user, section.campus_id, db, raise_error=True)
+    
+    # Verify student has access to the same campus
+    student = await db.get(User, grade_data.student_id)
+    if student and student.campus_id:
+        await check_campus_access(current_user, student.campus_id, db, raise_error=True)
     
     # Check if grade already exists
     existing_grade = await db.execute(
@@ -396,7 +527,7 @@ async def get_my_academic_standing(
 @router.post("/attendance/bulk", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
 async def record_attendance_bulk(
     attendance_data: AttendanceBulkCreate,
-    current_user: Dict[str, Any] = Depends(require_roles(["teacher", "admin"])),
+    current_user: Dict[str, Any] = Depends(require_teacher_or_admin()),
     db: AsyncSession = Depends(get_db)
 ) -> SuccessResponse:
     """Record attendance for multiple students (teacher only)"""

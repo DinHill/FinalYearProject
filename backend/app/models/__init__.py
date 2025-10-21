@@ -4,8 +4,10 @@ Models package - imports all models
 from app.models.base import BaseModel
 from app.models.user import (
     User, Campus, Major, UsernameSequence, StudentSequence, DeviceToken,
-    UserRole, UserStatus, Gender
+    UserRole as UserRoleEnum, UserStatus, Gender  # Renamed enum to avoid conflict
 )
+from app.models.role import Role
+from app.models.user_role import UserRole
 from app.models.academic import (
     Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance,
     SemesterType, CourseLevel, SectionStatus, EnrollmentStatus, AttendanceStatus,
@@ -31,7 +33,10 @@ __all__ = [
     
     # User models
     "User", "Campus", "Major", "UsernameSequence", "StudentSequence", "DeviceToken",
-    "UserRole", "UserStatus", "Gender",
+    "UserRoleEnum", "UserStatus", "Gender",
+    
+    # RBAC models
+    "Role", "UserRole",
     
     # Academic models
     "Semester", "Course", "CourseSection", "Schedule", "Enrollment", "Assignment", "Grade", "Attendance",

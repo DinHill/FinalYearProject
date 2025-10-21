@@ -1,20 +1,21 @@
 """
-Security utilities - authentication and authorization
+Security utilities - Firebase-only authentication
 """
 from fastapi import HTTPException, Depends, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 from app.core.firebase import FirebaseService
-from app.core.settings import settings
-from datetime import datetime, timedelta
-from jose import JWTError, jwt
 from passlib.context import CryptContext
+import logging
 
-# Password hashing
+logger = logging.getLogger(__name__)
+
+# Password hashing (kept for backward compatibility during migration)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# HTTP Bearer token security
-security = HTTPBearer()
+# HTTP Bearer token security with custom error handling
+# auto_error=False prevents default 403 error, we'll handle it and return 401
+security = HTTPBearer(auto_error=False)
 
 
 class SecurityUtils:
@@ -22,89 +23,81 @@ class SecurityUtils:
     
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hash a password"""
+        """
+        Hash a password
+        
+        Note: Kept for backward compatibility during Firebase migration.
+        New users should be created in Firebase, not with password hashes.
+        """
         return pwd_context.hash(password)
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash"""
+        """
+        Verify a password against its hash
+        
+        Note: Kept for backward compatibility during Firebase migration.
+        Should only be used for legacy users not yet migrated to Firebase.
+        """
         return pwd_context.verify(plain_password, hashed_password)
-    
-    @staticmethod
-    def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-        """Create JWT access token"""
-        to_encode = data.copy()
-        
-        if expires_delta:
-            expire = datetime.utcnow() + expires_delta
-        else:
-            expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        
-        to_encode.update({"exp": expire})
-        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-        return encoded_jwt
-    
-    @staticmethod
-    def decode_token(token: str) -> Dict[str, Any]:
-        """Decode JWT token"""
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            return payload
-        except JWTError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials"
-            )
 
 
 async def verify_firebase_token(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> Dict[str, Any]:
     """
-    Verify Firebase ID token OR JWT token (for admin login)
+    Verify Firebase ID token (Firebase-only authentication)
     
-    This is the main authentication dependency for all API endpoints
-    Supports both Firebase tokens and JWT tokens from admin-login
+    This is the main authentication dependency for all API endpoints.
+    Only Firebase ID tokens are accepted - JWT tokens are no longer supported.
     
     Usage:
         @app.get("/protected")
         async def protected_route(current_user: dict = Depends(verify_firebase_token)):
             user_id = current_user['uid']
-            role = current_user.get('role')
+            roles = current_user.get('roles', [])
             ...
+    
+    Returns:
+        dict: Decoded Firebase token with user information
+        - uid: Firebase user ID
+        - email: User email
+        - roles: List of user roles from custom claims
+        - other custom claims set in Firebase
+    
+    Raises:
+        HTTPException: 401 if token is invalid, expired, or revoked
     """
+    # Check if credentials were provided
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Authorization header with Bearer token is required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     try:
         # Extract token from Authorization header
         token = credentials.credentials
         
-        # First, try to decode as JWT token (for admin login)
-        try:
-            decoded_token = SecurityUtils.decode_token(token)
-            # JWT token successfully decoded
-            # Add user info to request state for logging
-            request.state.user_id = decoded_token.get('uid') or decoded_token.get('sub')
-            request.state.user_email = decoded_token.get('email')
-            request.state.user_role = decoded_token.get('role')
-            return decoded_token
-        except:
-            # Not a JWT token, try Firebase token
-            pass
-        
-        # Try to verify as Firebase token
+        # Verify Firebase token (always check if revoked for security)
         decoded_token = FirebaseService.verify_id_token(token, check_revoked=True)
         
         # Add user info to request state for logging
         request.state.user_id = decoded_token.get('uid')
         request.state.user_email = decoded_token.get('email')
-        request.state.user_role = decoded_token.get('role')
+        request.state.user_role = decoded_token.get('roles', [])
+        
+        logger.debug(f"Firebase token verified for user: {decoded_token.get('uid')}")
         
         return decoded_token
         
     except Exception as e:
+        logger.warning(f"Firebase token verification failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}",
+            detail="Invalid or expired Firebase token. Please re-authenticate.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

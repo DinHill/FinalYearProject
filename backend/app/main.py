@@ -65,14 +65,14 @@ app = FastAPI(
 )
 
 
-# CORS Middleware
+# CORS Middleware - Explicit allowlist (no wildcards)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=settings.cors_origins_list,  # Explicit list from settings
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-Process-Time"],
 )
 
 
@@ -201,6 +201,7 @@ from app.routers import (
 )
 from app.routers.admin_db import router as admin_db_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.me import router as me_router
 from app.api.v1.seed import router as seed_router
 
 app.include_router(auth_router, prefix="/api/v1")
@@ -211,6 +212,7 @@ app.include_router(documents_router, prefix="/api/v1")
 app.include_router(support_router, prefix="/api/v1")
 app.include_router(admin_db_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(me_router, prefix="/api/v1")  # /me endpoints for mobile app
 app.include_router(seed_router)  # Seeding endpoint (should be protected in production)
 
 # More routers to be added:

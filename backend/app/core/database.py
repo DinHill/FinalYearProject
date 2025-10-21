@@ -13,6 +13,12 @@ engine = create_async_engine(
     pool_size=settings.DATABASE_POOL_SIZE,
     max_overflow=settings.DATABASE_MAX_OVERFLOW,
     pool_pre_ping=True,  # Verify connections before using
+    connect_args={
+        "server_settings": {
+            "application_name": "academic_portal_api",
+            "statement_timeout": "5000"  # 5 seconds - prevents runaway queries
+        }
+    }
 )
 
 # Create async session factory

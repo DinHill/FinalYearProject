@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.rbac import require_roles, require_admin, get_user_campus_access, check_campus_access
 from app.core.exceptions import NotFoundError, BusinessLogicError
 from app.models.user import User
 from app.models.communication import SupportTicket, TicketEvent
@@ -60,7 +60,7 @@ def is_sla_breached(deadline: datetime) -> bool:
 async def create_support_ticket(
     ticket_data: SupportTicketCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Create a new support ticket.
@@ -127,21 +127,23 @@ async def list_support_tickets(
     category: Optional[str] = Query(None, description="Filter by category"),
     requester_id: Optional[UUID] = Query(None, description="Filter by requester"),
     assigned_to_id: Optional[UUID] = Query(None, description="Filter by assignee"),
+    campus_id: Optional[int] = Query(None, description="Filter by campus"),
     sla_breached: Optional[bool] = Query(None, description="Filter by SLA breach"),
     search: Optional[str] = Query(None, description="Search in subject/description"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
-    List support tickets with filters.
+    List support tickets with filters (campus-filtered).
     
     Access:
-    - Admins can see all tickets
+    - Admins can see tickets within their campus scope
     - Students/Teachers can see their own tickets and tickets assigned to them
     """
-    query = select(SupportTicket)
+    # Build query with join to User for campus filtering
+    query = select(SupportTicket).join(User, SupportTicket.requester_id == User.id)
     
     # Role-based filtering
     if current_user.role in ["student", "teacher"]:
@@ -152,6 +154,34 @@ async def list_support_tickets(
                 SupportTicket.assigned_to_id == current_user.id
             )
         )
+    else:
+        # Admin - apply campus filtering
+        user_campus_access = await get_user_campus_access(
+            {"uid": str(current_user.id), "roles": [current_user.role]}, db
+        )
+        
+        if campus_id:
+            # Specific campus requested - verify access
+            if user_campus_access is not None:
+                await check_campus_access(
+                    {"uid": str(current_user.id), "roles": [current_user.role]}, 
+                    campus_id, db, raise_error=True
+                )
+            query = query.where(User.campus_id == campus_id)
+        else:
+            # No specific campus - filter by user's campus access
+            if user_campus_access is not None:  # Campus-scoped admin
+                if user_campus_access:
+                    query = query.where(User.campus_id.in_(user_campus_access))
+                else:
+                    # No campus assignments - return empty
+                    return PaginatedResponse(
+                        items=[],
+                        total=0,
+                        page=page,
+                        page_size=page_size,
+                        pages=0
+                    )
     
     if status:
         query = query.where(SupportTicket.status == status)
@@ -221,7 +251,7 @@ async def list_support_tickets(
 async def get_support_ticket(
     ticket_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Get ticket details including all events.
@@ -270,7 +300,7 @@ async def update_support_ticket(
     ticket_id: int,
     update_data: SupportTicketUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "support_admin"]))
+    current_user: User = Depends(require_roles("super_admin", "support_admin"))
 ):
     """
     Update support ticket (assign, change status, priority, etc.).
@@ -372,7 +402,7 @@ async def add_ticket_event(
     ticket_id: int,
     event_data: TicketEventCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Add an event/comment to a ticket.
@@ -422,7 +452,7 @@ async def add_ticket_event(
 async def list_ticket_events(
     ticket_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student", "teacher", "admin"]))
+    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     List all events for a ticket.
@@ -462,7 +492,7 @@ async def list_ticket_events(
 @router.get("/stats/summary", response_model=dict)
 async def get_support_stats(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "support_admin"]))
+    current_user: User = Depends(require_roles("super_admin", "support_admin"))
 ):
     """
     Get support ticket statistics.

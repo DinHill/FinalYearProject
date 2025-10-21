@@ -20,117 +20,74 @@ from app.schemas.auth import (
 from app.schemas.base import SuccessResponse
 from pydantic import BaseModel
 from typing import Dict, Any
-from datetime import datetime, timedelta
 import logging
-import jwt
-import os
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-# Admin login schema
-class AdminLoginRequest(BaseModel):
-    user_id: str
-    password: str
+# Username to Email lookup schema
+class UsernameToEmailRequest(BaseModel):
+    username: str
 
-class AdminLoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: Dict[str, Any]
+class UsernameToEmailResponse(BaseModel):
+    email: str
+    full_name: str
 
 
 @router.post(
-    "/admin-login",
-    response_model=AdminLoginResponse,
+    "/username-to-email",
+    response_model=UsernameToEmailResponse,
     status_code=status.HTTP_200_OK,
-    summary="Admin/Teacher login with username/password",
+    summary="Convert username to email for Firebase login",
     description="""
-    Simple username/password login for admin portal
+    Lookup email address from username for Firebase authentication.
     
-    Returns JWT access token for API authentication
+    Frontend flow:
+    1. User enters username
+    2. Call this endpoint to get email
+    3. Use email with Firebase signInWithEmailAndPassword
     """
 )
-async def admin_login(
-    request: AdminLoginRequest,
+async def username_to_email(
+    request: UsernameToEmailRequest,
     db: AsyncSession = Depends(get_db)
-) -> AdminLoginResponse:
+) -> UsernameToEmailResponse:
     """
-    Admin/Teacher login endpoint - returns JWT token
+    Convert username to email for Firebase login
     """
     try:
         # Find user by username
         result = await db.execute(
-            select(User).where(User.username == request.user_id)
+            select(User).where(User.username == request.username)
         )
         user = result.scalar_one_or_none()
         
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
             )
         
-        # Verify password
-        # Temporary workaround: allow admin123 for admin user while bcrypt is being fixed
-        password_valid = False
-        if user.username == "admin" and request.password == "admin123":
-            password_valid = True
-        elif user.password_hash:
-            try:
-                password_valid = SecurityUtils.verify_password(request.password, user.password_hash)
-            except Exception as e:
-                logger.error(f"Password verification error: {str(e)}")
-                # Fallback for bcrypt compatibility issues
-                if user.username == "admin" and request.password == "admin123":
-                    password_valid = True
-        
-        if not password_valid:
+        if not user.email:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User has no email address"
             )
         
-        # Check if user is admin or teacher
-        if user.role not in ['admin', 'teacher']:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. Admin or teacher role required."
-            )
-        
-        # Generate JWT token
-        secret_key = os.getenv("SECRET_KEY", "your-secret-key-here")
-        token_data = {
-            "sub": str(user.id),
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "exp": datetime.utcnow() + timedelta(hours=24)
-        }
-        access_token = jwt.encode(token_data, secret_key, algorithm="HS256")
-        
-        return AdminLoginResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user={
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "full_name": user.full_name,
-                "role": user.role,
-                "status": user.status
-            }
+        return UsernameToEmailResponse(
+            email=user.email,
+            full_name=user.full_name
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Admin login error: {str(e)}", exc_info=True)
-        # Return the actual error in development to help debug
+        logger.error(f"Username to email lookup error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Login error: {str(e)}"
+            detail="Lookup failed"
         )
 
 

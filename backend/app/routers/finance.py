@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.rbac import require_roles, require_student, get_user_campus_access, check_campus_access
+from app.core.idempotency import IdempotencyManager
+from fastapi.responses import JSONResponse
 from app.core.exceptions import NotFoundError, BusinessLogicError
 from app.models.user import User
 from app.models.finance import Invoice, InvoiceLine, Payment, FeeStructure
@@ -38,7 +40,7 @@ router = APIRouter(prefix="/finance", tags=["Finance"])
 async def create_invoice(
     invoice_data: InvoiceCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin"))
 ):
     """
     Create a new invoice for a student.
@@ -112,26 +114,51 @@ async def list_invoices(
     student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
     semester_id: Optional[int] = Query(None, description="Filter by semester ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    campus_id: Optional[int] = Query(None, description="Filter by campus ID"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin", "student"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
-    List invoices with filters.
+    List invoices with filters (campus-filtered).
     
     Access:
-    - Admins can see all invoices
+    - Admins can see invoices within their campus scope
     - Students can only see their own invoices
     """
-    # Build query
-    query = select(Invoice)
+    # Build query - need to join with User to filter by campus
+    query = select(Invoice).join(User, Invoice.student_id == User.id)
     
     # Students can only see their own invoices
     if current_user.role == "student":
         query = query.where(Invoice.student_id == current_user.id)
-    elif student_id:
-        query = query.where(Invoice.student_id == student_id)
+    else:
+        # Admin - apply campus filtering
+        user_campus_access = await get_user_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, db)
+        
+        if campus_id:
+            # Specific campus requested - verify access
+            if user_campus_access is not None:
+                await check_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, campus_id, db, raise_error=True)
+            query = query.where(User.campus_id == campus_id)
+        else:
+            # No specific campus - filter by user's campus access
+            if user_campus_access is not None:  # Campus-scoped admin
+                if user_campus_access:
+                    query = query.where(User.campus_id.in_(user_campus_access))
+                else:
+                    # No campus assignments - return empty
+                    return PaginatedResponse(
+                        items=[],
+                        total=0,
+                        page=page,
+                        page_size=page_size,
+                        pages=0
+                    )
+        
+        if student_id:
+            query = query.where(Invoice.student_id == student_id)
     
     if semester_id:
         query = query.where(Invoice.semester_id == semester_id)
@@ -164,7 +191,7 @@ async def list_invoices(
 async def get_invoice(
     invoice_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin", "student"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     Get invoice details including line items.
@@ -207,9 +234,9 @@ async def get_invoice(
 @router.post("/payments", response_model=PaymentResponse, status_code=201)
 async def create_payment(
     payment_data: PaymentCreate,
-    idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin", "student"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     Record a payment for an invoice.
@@ -223,15 +250,12 @@ async def create_payment(
     - Automatic invoice status update
     - Payment validation
     """
-    # Check for duplicate payment with same idempotency key
+    # Check for cached result via IdempotencyManager
     if idempotency_key:
-        duplicate_query = await db.execute(
-            select(Payment).where(Payment.idempotency_key == idempotency_key)
-        )
-        existing_payment = duplicate_query.scalar_one_or_none()
-        if existing_payment:
-            # Return existing payment (idempotent)
-            return existing_payment
+        cached = await IdempotencyManager.get_cached_response(idempotency_key, db)
+        if cached:
+            response_data, status_code = cached
+            return JSONResponse(content=response_data, status_code=status_code)
     
     # Verify invoice exists
     invoice_query = await db.execute(
@@ -260,11 +284,11 @@ async def create_payment(
     payment = Payment(
         invoice_id=payment_data.invoice_id,
         amount=payment_data.amount,
-        payment_date=payment_data.payment_date or datetime.utcnow().date(),
+        paid_at=payment_data.payment_date or datetime.utcnow(),
         payment_method=payment_data.payment_method,
-        transaction_reference=payment_data.transaction_reference,
+        reference_number=payment_data.transaction_reference,
         notes=payment_data.notes,
-        idempotency_key=idempotency_key,
+        processed_by=current_user.id if hasattr(current_user, 'id') else None,
     )
     db.add(payment)
     
@@ -277,8 +301,33 @@ async def create_payment(
     
     await db.commit()
     await db.refresh(payment)
-    
-    return payment
+
+    # Prepare response payload to store with idempotency key
+    response_payload = {
+        "id": payment.id,
+        "invoice_id": payment.invoice_id,
+        "amount": float(payment.amount),
+        "payment_method": str(payment.payment_method),
+        "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+        "status": str(payment.status) if hasattr(payment, 'status') else "completed",
+    }
+
+    # Store idempotency result so repeated requests return same response
+    if idempotency_key:
+        try:
+            await IdempotencyManager.store_key(
+                idempotency_key,
+                endpoint="/finance/payments",
+                request_data=payment_data.dict(),
+                response_data=response_payload,
+                status_code=201,
+                db=db,
+            )
+        except Exception:
+            # Do not block response on idempotency store failure
+            pass
+
+    return JSONResponse(content=response_payload, status_code=201)
 
 
 @router.get("/payments", response_model=PaginatedResponse[PaymentResponse])
@@ -286,26 +335,51 @@ async def list_payments(
     invoice_id: Optional[int] = Query(None, description="Filter by invoice ID"),
     student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
+    campus_id: Optional[int] = Query(None, description="Filter by campus ID"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin", "student"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
-    List payments with filters.
+    List payments with filters (campus-filtered).
     
     Access:
-    - Admins can see all payments
+    - Admins can see payments within their campus scope
     - Students can only see their own payments
     """
-    # Build base query with join to get student_id
-    query = select(Payment).join(Invoice)
+    # Build base query with join to get student_id and campus
+    query = select(Payment).join(Invoice).join(User, Invoice.student_id == User.id)
     
     # Students can only see their own payments
     if current_user.role == "student":
         query = query.where(Invoice.student_id == current_user.id)
-    elif student_id:
-        query = query.where(Invoice.student_id == student_id)
+    else:
+        # Admin - apply campus filtering
+        user_campus_access = await get_user_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, db)
+        
+        if campus_id:
+            # Specific campus requested - verify access
+            if user_campus_access is not None:
+                await check_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, campus_id, db, raise_error=True)
+            query = query.where(User.campus_id == campus_id)
+        else:
+            # No specific campus - filter by user's campus access
+            if user_campus_access is not None:  # Campus-scoped admin
+                if user_campus_access:
+                    query = query.where(User.campus_id.in_(user_campus_access))
+                else:
+                    # No campus assignments - return empty
+                    return PaginatedResponse(
+                        items=[],
+                        total=0,
+                        page=page,
+                        page_size=page_size,
+                        pages=0
+                    )
+        
+        if student_id:
+            query = query.where(Invoice.student_id == student_id)
     
     if invoice_id:
         query = query.where(Payment.invoice_id == invoice_id)
@@ -338,7 +412,7 @@ async def list_payments(
 async def get_student_financial_summary(
     student_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin", "student"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     Get financial summary for a student.
@@ -400,7 +474,7 @@ async def get_student_financial_summary(
 @router.get("/students/my/summary", response_model=StudentFinancialSummary)
 async def get_my_financial_summary(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["student"]))
+    current_user: User = Depends(require_student())
 ):
     """
     Get financial summary for current student.
@@ -414,7 +488,7 @@ async def get_my_financial_summary(
 async def get_semester_financial_summary(
     semester_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "finance_admin"]))
+    current_user: User = Depends(require_roles("super_admin", "finance_admin"))
 ):
     """
     Get financial summary for a semester.

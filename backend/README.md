@@ -501,23 +501,47 @@ backend/
 
 ## 🔐 Authentication Flow
 
-### Mobile App (Student/Teacher)
+### ✅ Firebase-Only Authentication (Updated Oct 21, 2025)
 
-1. User enters studentID + password
+All user types now use Firebase authentication. JWT tokens have been removed.
+
+### Mobile App (Students)
+
+**Option 1: Custom Token Flow (Recommended for Mobile)**
+
+1. User enters student_id + password
 2. POST `/api/v1/auth/student-login`
 3. Backend verifies credentials in PostgreSQL
 4. Backend creates Firebase custom token with claims
-5. Client calls `signInWithCustomToken()`
+5. Client calls `signInWithCustomToken(customToken)`
 6. Client receives Firebase ID token
-7. All API requests include: `Authorization: Bearer <ID_TOKEN>`
+7. All API requests include: `Authorization: Bearer <FIREBASE_ID_TOKEN>`
 
-### Admin Web Portal
+**Option 2: Email/Password Flow**
 
-1. User logs in with Firebase Web SDK
-2. Client receives Firebase ID token
-3. POST `/api/v1/auth/session` (optional, for SSR)
-4. Backend sets HttpOnly session cookie
-5. API requests include token or cookie
+1. POST `/api/v1/auth/username-to-email` with student_id
+2. Backend returns user's email address
+3. Client calls `signInWithEmailAndPassword(email, password)`
+4. Client receives Firebase ID token
+5. All API requests include: `Authorization: Bearer <FIREBASE_ID_TOKEN>`
+
+### Admin/Teacher Web Portal
+
+1. User enters username
+2. POST `/api/v1/auth/username-to-email` with username
+3. Backend returns email address
+4. Client calls Firebase `signInWithEmailAndPassword(email, password)`
+5. Client receives Firebase ID token
+6. All API requests include: `Authorization: Bearer <FIREBASE_ID_TOKEN>`
+
+### Token Verification
+
+- All endpoints verify Firebase ID tokens only
+- Tokens are validated with Firebase Admin SDK
+- Token revocation is checked on each request
+- No JWT tokens accepted (removed Oct 21, 2025)
+
+**Migration Guide:** See [FIREBASE_MIGRATION_COMPLETE.md](./FIREBASE_MIGRATION_COMPLETE.md)
 
 ## 🗄️ Database Schema
 
@@ -570,6 +594,7 @@ backend/
 
 ### Authentication
 
+- `POST /api/v1/auth/username-to-email` - Convert username to email
 - `POST /api/v1/auth/student-login` - Student login (custom token)
 - `POST /api/v1/auth/session` - Create session cookie
 - `POST /api/v1/auth/logout` - Logout

@@ -62,6 +62,7 @@ class User(BaseModel):
     last_login = Column(DateTime(timezone=True))
     
     # Relationships
+    user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     campus = relationship("Campus", back_populates="users")
     major = relationship("Major", back_populates="users")
     enrollments = relationship("Enrollment", back_populates="student", foreign_keys="[Enrollment.student_id]")

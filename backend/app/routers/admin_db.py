@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.rbac import require_admin
 from app.models import User
 
 router = APIRouter(prefix="/admin/db", tags=["Admin - Database"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/admin/db", tags=["Admin - Database"])
 @router.get("/tables")
 async def list_tables(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_admin())
 ):
     """
     List all tables in the database
@@ -41,7 +41,7 @@ async def list_tables(
 async def count_table_rows(
     table_name: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_admin())
 ):
     """
     Count rows in a specific table
@@ -61,7 +61,7 @@ async def count_table_rows(
 @router.get("/stats")
 async def database_stats(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_admin())
 ):
     """
     Get database statistics - row counts for all major tables
@@ -96,7 +96,7 @@ async def get_table_sample(
     table_name: str,
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_admin())
 ):
     """
     Get sample rows from a table

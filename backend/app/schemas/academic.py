@@ -1,7 +1,7 @@
 """
 Academic domain schemas - courses, enrollments, grades, attendance
 """
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ConfigDict
 from app.schemas.base import BaseSchema
 from datetime import datetime, date as date_type, time
 from typing import Optional, List
@@ -53,10 +53,10 @@ class SemesterResponse(SemesterBase):
 
 class CourseBase(BaseSchema):
     """Base course schema"""
-    code: str = Field(..., description="Course code", example="COMP1640", pattern=r"^[A-Z]{4}\d{4}$")
+    code: str = Field(..., description="Course code", example="COMP1640", pattern=r"^[A-Z]{3,4}\d{4}$", alias="course_code")  # Allow 3-4 letters
     name: str = Field(..., description="Course name", example="Enterprise Web Software Development")
     description: Optional[str] = Field(None, description="Course description")
-    credits: int = Field(..., description="Credit hours", ge=1, le=6)
+    credits: int = Field(..., description="Credit hours", ge=1, le=20)  # Increased to 20 to accommodate actual data
     major_id: Optional[int] = Field(None, description="Major ID (null for common courses)")
 
 
@@ -69,7 +69,7 @@ class CourseUpdate(BaseSchema):
     """Update course request"""
     name: Optional[str] = None
     description: Optional[str] = None
-    credits: Optional[int] = Field(None, ge=1, le=6)
+    credits: Optional[int] = Field(None, ge=1, le=20)  # Increased to 20
     major_id: Optional[int] = None
 
 
@@ -77,6 +77,11 @@ class CourseResponse(CourseBase):
     """Course response"""
     id: int
     created_at: datetime
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 
 # ============================================================================
@@ -88,11 +93,11 @@ class CourseSectionBase(BaseSchema):
     course_id: int = Field(..., description="Course ID")
     semester_id: int = Field(..., description="Semester ID")
     section_number: str = Field(..., description="Section number", example="01", pattern=r"^\d{2}$")
-    teacher_id: int = Field(..., description="Teacher user ID")
+    instructor_id: int = Field(..., description="Instructor user ID", alias="teacher_id")
     campus_id: int = Field(..., description="Campus ID")
     max_students: int = Field(..., description="Maximum student capacity", ge=1, le=100)
     room: Optional[str] = Field(None, description="Room number", example="A101")
-    status: str = Field("open", description="Section status", pattern="^(open|closed|cancelled)$")
+    status: str = Field("active", description="Section status", pattern="^(active|cancelled|completed)$")
 
 
 class CourseSectionCreate(CourseSectionBase):
@@ -102,10 +107,10 @@ class CourseSectionCreate(CourseSectionBase):
 
 class CourseSectionUpdate(BaseSchema):
     """Update course section request"""
-    teacher_id: Optional[int] = None
+    instructor_id: Optional[int] = None
     max_students: Optional[int] = Field(None, ge=1, le=100)
     room: Optional[str] = None
-    status: Optional[str] = Field(None, pattern="^(open|closed|cancelled)$")
+    status: Optional[str] = Field(None, pattern="^(active|cancelled|completed)$")
 
 
 class CourseSectionResponse(CourseSectionBase):
@@ -113,6 +118,11 @@ class CourseSectionResponse(CourseSectionBase):
     id: int
     enrolled_count: int = Field(..., description="Current enrollment count")
     created_at: datetime
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True  # Allow both instructor_id and teacher_id
+    )
 
 
 # ============================================================================

@@ -5,27 +5,53 @@ import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from app.core.settings import settings
 import json
+import os
 from typing import Optional, Dict, Any
 
 
 def initialize_firebase():
     """Initialize Firebase Admin SDK"""
     try:
-        # Create credentials from environment variables
-        cred_dict = {
-            "type": "service_account",
-            "project_id": settings.FIREBASE_PROJECT_ID,
-            "private_key_id": settings.FIREBASE_PRIVATE_KEY_ID,
-            "private_key": settings.FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
-            "client_email": settings.FIREBASE_CLIENT_EMAIL,
-            "client_id": settings.FIREBASE_CLIENT_ID,
-            "auth_uri": settings.FIREBASE_AUTH_URI,
-            "token_uri": settings.FIREBASE_TOKEN_URI,
-            "auth_provider_x509_cert_url": settings.FIREBASE_AUTH_PROVIDER_CERT_URL,
-            "client_x509_cert_url": settings.FIREBASE_CLIENT_CERT_URL,
-        }
+        # Try to use credentials file if it exists
+        creds_path = getattr(settings, 'FIREBASE_CREDENTIALS_PATH', None)
+        if creds_path:
+            # Make path absolute if it's relative
+            if not os.path.isabs(creds_path):
+                # Get the base directory (backend/)
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                creds_path = os.path.join(base_dir, creds_path)
+            
+            if os.path.exists(creds_path):
+                print(f"✅ Loading Firebase credentials from: {creds_path}")
+                cred = credentials.Certificate(creds_path)
+            else:
+                print(f"⚠️  Firebase credentials file not found at: {creds_path}")
+                creds_path = None
         
-        cred = credentials.Certificate(cred_dict)
+        if not creds_path:
+            # Fall back to environment variables (old method)
+            print("⚠️  Firebase credentials file not found, trying environment variables...")
+            
+            # Skip Firebase initialization if using dummy credentials
+            if not hasattr(settings, 'FIREBASE_PRIVATE_KEY_ID') or settings.FIREBASE_PRIVATE_KEY_ID == "dummy-key-id":
+                print("⚠️  Firebase: Using dummy credentials, Firebase features disabled")
+                return False
+            
+            # Create credentials from environment variables
+            cred_dict = {
+                "type": "service_account",
+                "project_id": settings.FIREBASE_PROJECT_ID,
+                "private_key_id": settings.FIREBASE_PRIVATE_KEY_ID,
+                "private_key": settings.FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+                "client_email": settings.FIREBASE_CLIENT_EMAIL,
+                "client_id": settings.FIREBASE_CLIENT_ID,
+                "auth_uri": settings.FIREBASE_AUTH_URI,
+                "token_uri": settings.FIREBASE_TOKEN_URI,
+                "auth_provider_x509_cert_url": settings.FIREBASE_AUTH_PROVIDER_CERT_URL,
+                "client_x509_cert_url": settings.FIREBASE_CLIENT_CERT_URL,
+            }
+            
+            cred = credentials.Certificate(cred_dict)
         
         # Initialize app if not already initialized
         if not firebase_admin._apps:
@@ -35,7 +61,8 @@ def initialize_firebase():
         return True
     except Exception as e:
         print(f"❌ Failed to initialize Firebase: {e}")
-        raise
+        print("⚠️  Continuing without Firebase - authentication will not work")
+        return False
 
 
 def get_firestore_client():
