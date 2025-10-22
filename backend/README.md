@@ -21,11 +21,13 @@ FastAPI-based REST API for Greenwich University Vietnam Academic Management Syst
 ## 🚀 Quick Links
 
 - **📖 [API Documentation](./API_REFERENCE.md)** - Complete API reference with examples
-- **🚢 [Deployment Guide](./DEPLOYMENT_GUIDE.md)** - Step-by-step deployment instructions
-- **⚡ [Quick Deploy](./QUICK_DEPLOY.md)** - Fast deployment checklist
-- **🧪 [Testing Guide](./TESTING.md)** - How to run tests
-- **📐 [Architecture](./VISUAL_OVERVIEW.md)** - System architecture overview
-- **📝 [Build Summary](./BUILD_COMPLETE.md)** - Complete feature list
+- **🏗️ [Architecture](./docs/ARCHITECTURE.md)** - System architecture & design
+- **🚢 [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Step-by-step deployment
+- **⚡ [Quick Deploy](./docs/QUICK_DEPLOY.md)** - Fast deployment checklist
+- **⚡ [Quick Start](./docs/QUICKSTART.md)** - Get started quickly
+- **🧪 [Testing Guide](./docs/TESTING_GUIDE.md)** - How to run tests
+- **� [Firebase Setup](./docs/FIREBASE_MIGRATION_GUIDE.md)** - Firebase configuration
+- **☁️ [GCS Setup](./docs/GCS_SETUP_GUIDE.md)** - Google Cloud Storage setup
 
 ## ✨ Features
 
@@ -149,8 +151,9 @@ pytest -m integration
 
 ### Getting Started
 
-- **[Quick Deploy Guide](./QUICK_DEPLOY.md)** - Fast deployment checklist ⚡
-- **[Full Deployment Guide](./DEPLOYMENT_GUIDE.md)** - Complete deployment instructions 📦
+- **[Quick Start](./docs/QUICKSTART.md)** - Get up and running quickly ⚡
+- **[Quick Deploy](./docs/QUICK_DEPLOY.md)** - Fast deployment checklist 🚀
+- **[Full Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Complete deployment 📦
 - **[Environment Setup](./.env.example)** - Environment variable template
 
 ### API Documentation
@@ -161,15 +164,15 @@ pytest -m integration
 
 ### Architecture & Design
 
-- **[Visual Overview](./VISUAL_OVERVIEW.md)** - System architecture diagrams 📐
-- **[Build Summary](./BUILD_COMPLETE.md)** - Complete feature list ✅
-- **[Final Summary](./FINAL_SUMMARY.md)** - Project completion report 📊
+- **[Architecture Guide](./docs/ARCHITECTURE.md)** - Complete system architecture 🏗️
+- **[Technology Stack](./docs/ARCHITECTURE.md#-technology-stack)** - Tech overview
+- **[Database Schema](./docs/ARCHITECTURE.md#-database-schema-28-tables)** - All 28 tables
 
 ### Development
 
-- **[Testing Guide](./TESTING.md)** - How to write and run tests 🧪
-- **[Test Summary](./TESTING_COMPLETE.md)** - Test coverage report
-- **[Progress Report](./PROGRESS.md)** - Technical specifications
+- **[Testing Guide](./docs/TESTING_GUIDE.md)** - How to write and run tests 🧪
+- **[Firebase Setup](./docs/FIREBASE_MIGRATION_GUIDE.md)** - Firebase configuration 🔥
+- **[GCS Setup](./docs/GCS_SETUP_GUIDE.md)** - Google Cloud Storage setup ☁️
 
 ## 📊 API Endpoints
 
