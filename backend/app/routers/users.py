@@ -186,7 +186,7 @@ async def list_users(
     role: Optional[str] = Query(None, description="Filter by role"),
     campus_id: Optional[int] = Query(None, description="Filter by campus"),
     major_id: Optional[int] = Query(None, description="Filter by major"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    status_filter: Optional[str] = Query(None, description="Filter by status"),
     search: Optional[str] = Query(None, description="Search by name, username, or email"),
     current_user: Dict[str, Any] = Depends(require_teacher_or_admin()),
     db: AsyncSession = Depends(get_db)
@@ -209,8 +209,8 @@ async def list_users(
             conditions.append(User.role == role)
         if major_id:
             conditions.append(User.major_id == major_id)
-        if status:
-            conditions.append(User.status == status)
+        if status_filter:
+            conditions.append(User.status == status_filter)
         if search:
             search_term = f"%{search}%"
             conditions.append(
@@ -276,7 +276,7 @@ async def list_users(
                 year_entered=user.year_entered,
                 phone_number=user.phone_number,
                 date_of_birth=user.date_of_birth,
-                gender=user.gender,
+                gender=getattr(user, 'gender', None),
                 created_at=user.created_at
             )
             for user in users
@@ -316,7 +316,7 @@ async def get_user(
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
+
     return UserResponse(
         id=user.id,
         firebase_uid=user.firebase_uid,
@@ -330,7 +330,7 @@ async def get_user(
         year_entered=user.year_entered,
         phone_number=user.phone_number,
         date_of_birth=user.date_of_birth,
-        gender=user.gender,
+        gender=getattr(user, 'gender', None),
         created_at=user.created_at
     )
 
@@ -376,7 +376,7 @@ async def update_user(
         year_entered=user.year_entered,
         phone_number=user.phone_number,
         date_of_birth=user.date_of_birth,
-        gender=user.gender,
+        gender=getattr(user, 'gender', None),
         created_at=user.created_at
     )
 
