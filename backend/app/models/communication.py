@@ -56,6 +56,26 @@ class EventType(str, enum.Enum):
     RESOLUTION = "resolution"
 
 
+class NotificationType(str, enum.Enum):
+    """Notification type enum"""
+    ANNOUNCEMENT = "announcement"
+    GRADE_POSTED = "grade_posted"
+    ENROLLMENT = "enrollment"
+    ATTENDANCE = "attendance"
+    FEE_DUE = "fee_due"
+    DOCUMENT_READY = "document_ready"
+    MESSAGE = "message"
+    SYSTEM = "system"
+
+
+class NotificationPriority(str, enum.Enum):
+    """Notification priority enum"""
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
 class ChatRoom(BaseModel):
     """Chat room model"""
     
@@ -124,36 +144,27 @@ class SupportTicket(BaseModel):
     
     __tablename__ = "support_tickets"
     
-    ticket_number = Column(String(20), unique=True, nullable=False, index=True)
-    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Changed from requester_id
     
     # Ticket Info
     subject = Column(String(200), nullable=False)
-    description = Column(Text, nullable=False)
-    category = Column(SQLEnum(TicketCategory), nullable=False, index=True)
+    description = Column(Text)
+    category = Column(String(50))  # Matches database varchar
     
     # Priority & Status
-    priority = Column(SQLEnum(TicketPriority), default=TicketPriority.NORMAL, index=True)
-    status = Column(SQLEnum(TicketStatus), default=TicketStatus.OPEN, index=True)
+    priority = Column(String(20), default="medium", index=True)  # Changed default from "normal" to "medium"
+    status = Column(String(20), default="open", index=True)
     
     # Assignment
     assigned_to = Column(Integer, ForeignKey("users.id"), index=True)
-    assigned_at = Column(DateTime(timezone=True))
-    
-    # Resolution
-    resolution = Column(Text)
-    resolved_at = Column(DateTime(timezone=True))
-    
-    # SLA
-    sla_due_at = Column(DateTime(timezone=True))
     
     # Relationships
-    requester = relationship("User", back_populates="support_tickets", foreign_keys=[requester_id])
+    user = relationship("User", back_populates="support_tickets", foreign_keys=[user_id])  # Changed from requester to user
     assignee = relationship("User", foreign_keys=[assigned_to])
-    events = relationship("TicketEvent", back_populates="ticket", cascade="all, delete-orphan")
+    events = relationship("TicketEvent", back_populates="ticket")
     
     def __repr__(self):
-        return f"<SupportTicket {self.ticket_number}>"
+        return f"<SupportTicket {self.id} - {self.subject}>"
 
 
 class TicketEvent(BaseModel):
@@ -180,3 +191,38 @@ class TicketEvent(BaseModel):
     
     def __repr__(self):
         return f"<TicketEvent {self.event_type} for Ticket{self.ticket_id}>"
+
+
+class Notification(BaseModel):
+    """User notification model"""
+    
+    __tablename__ = "notifications"
+    
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Notification Content
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(SQLEnum(NotificationType), nullable=False, index=True)
+    priority = Column(SQLEnum(NotificationPriority), default=NotificationPriority.NORMAL)
+    
+    # Status
+    is_read = Column(Boolean, default=False, index=True)
+    read_at = Column(DateTime(timezone=True))
+    
+    # Action Link
+    action_url = Column(String(500))
+    action_text = Column(String(100))
+    
+    # Related Entity
+    related_entity_type = Column(String(50))  # e.g., "grade", "announcement", "enrollment"
+    related_entity_id = Column(Integer)
+    
+    # Extra Data
+    extra_data = Column(Text)  # JSON string for additional data
+    
+    # Relationships
+    user = relationship("User", back_populates="notifications")
+    
+    def __repr__(self):
+        return f"<Notification {self.id} - {self.title}>"

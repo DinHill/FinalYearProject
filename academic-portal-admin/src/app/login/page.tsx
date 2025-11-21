@@ -1,20 +1,34 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Building2, Shield, User, Lock, Loader2 } from 'lucide-react';
 import { useLogin } from '@/lib/hooks';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
-  const [userId, setUserId] = useState('admin001');
-  const [password, setPassword] = useState('admin123');
+  const [userId, setUserId] = useState('super_admin');
+  const [password, setPassword] = useState('Test123!@#');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
   
   const loginMutation = useLogin();
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const savedUserId = localStorage.getItem('remembered_user_id');
+    const savedPassword = localStorage.getItem('remembered_password');
+    if (savedUserId && savedPassword) {
+      setUserId(savedUserId);
+      setPassword(savedPassword);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +40,24 @@ export default function LoginPage() {
     loginMutation.mutate(
       { user_id: userId, password },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Handle remember me
+          if (rememberMe) {
+            localStorage.setItem('remembered_user_id', userId);
+            localStorage.setItem('remembered_password', password);
+          } else {
+            localStorage.removeItem('remembered_user_id');
+            localStorage.removeItem('remembered_password');
+          }
+
+          // Token is already set in the mutation
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          const token = localStorage.getItem('admin_token');
+          if (!token) {
+            console.error('Token not found in localStorage after login!');
+          }
+          
           router.push('/dashboard');
         },
       }
@@ -114,13 +145,14 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" className="rounded border-gray-300 text-blue-600" />
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox 
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    className="border-gray-300"
+                  />
                   <span className="text-gray-700">Remember me</span>
                 </label>
-                <button type="button" className="text-blue-600 hover:text-blue-800 font-medium">
-                  Forgot password?
-                </button>
               </div>
 
               <Button
@@ -140,18 +172,12 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm font-medium text-blue-900 mb-2">⚠️ Database is Empty</p>
+              <p className="text-sm font-medium text-blue-900 mb-2">🔐 Local Development Login</p>
               <div className="text-sm text-blue-800 space-y-1">
-                <p>The database has no users yet. To login, you need to:</p>
-                <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>Run migrations on production database</li>
-                  <li>Create an admin user via API or database</li>
-                  <li>Or use the simpler demo credentials if seeded</li>
-                </ol>
-                <p className="mt-2 font-medium">After seeding, use:</p>
+                <p className="font-medium">Super Admin Credentials:</p>
                 <div className="mt-1 pl-2">
-                  <div><strong>Username:</strong> admin</div>
-                  <div><strong>Password:</strong> admin123</div>
+                  <div><strong>Username:</strong> super_admin</div>
+                  <div><strong>Password:</strong> Test123!@#</div>
                 </div>
               </div>
             </div>

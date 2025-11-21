@@ -39,13 +39,10 @@ class Settings(BaseSettings):
     FIREBASE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"
     FIREBASE_AUTH_PROVIDER_CERT_URL: str = "https://www.googleapis.com/oauth2/v1/certs"
     FIREBASE_CLIENT_CERT_URL: Optional[str] = None
+    FIREBASE_WEB_API_KEY: Optional[str] = None  # For Firebase Auth REST API (password reset emails)
     
-    # Google Cloud Storage (Optional - for file uploads)
-    GCP_PROJECT_ID: Optional[str] = None
-    GCS_BUCKET_NAME: Optional[str] = None
-    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
-    
-    # Cloudinary (Alternative to GCS - for file uploads)
+    # Cloudinary (Optional - for file uploads in production)
+    # If not configured, will use local storage for development/testing
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
     CLOUDINARY_API_KEY: Optional[str] = None
     CLOUDINARY_API_SECRET: Optional[str] = None
@@ -67,7 +64,7 @@ class Settings(BaseSettings):
     SENDGRID_FROM_NAME: str = "Greenwich University"
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:19006,https://academic-portal-admin.vercel.app"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:19006,http://192.168.1.30:8081,https://academic-portal-admin.vercel.app"
     CORS_ALLOW_CREDENTIALS: bool = True
     
     @property

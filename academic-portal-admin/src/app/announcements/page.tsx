@@ -1,9 +1,18 @@
+'use client';
+
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Plus, 
   Search, 
@@ -11,153 +20,52 @@ import {
   Calendar,
   Users,
   Eye,
-  Edit3,
-  Send,
-  Clock,
+  Edit,
   AlertCircle,
   CheckCircle,
   MoreHorizontal,
   Filter,
-  Pin
+  Trash2,
+  FileText
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { api, type Announcement } from '@/lib/api';
+import { useState } from 'react';
+import { CreateAnnouncementDialog } from '@/components/dashboard/CreateAnnouncementDialog';
+import { EditAnnouncementDialog } from '@/components/dashboard/EditAnnouncementDialog';
+import { DeleteAnnouncementDialog } from '@/components/dashboard/DeleteAnnouncementDialog';
+import { ViewAnnouncementDialog } from '@/components/announcements/ViewAnnouncementDialog';
 
 export default function AnnouncementsPage() {
-  const mockAnnouncements = [
-    {
-      id: 1,
-      title: 'Spring Semester Registration Opens',
-      content: 'Registration for Spring 2024 semester will begin on March 1st. Students can access the registration portal...',
-      category: 'Academic',
-      priority: 'High',
-      status: 'Published',
-      publishDate: '2024-02-15',
-      expiryDate: '2024-03-15',
-      views: 1245,
-      author: 'Academic Affairs',
-      targetAudience: 'All Students',
-      isPinned: true
+  const [activeTab, setActiveTab] = useState('news');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<any>(null);
+  
+  // Fetch announcements from API
+  const { data: announcementsData, isLoading } = useQuery({
+    queryKey: ['announcements'],
+    queryFn: async () => {
+      const result = await api.getAnnouncements(1, 20);
+      if (result.success) {
+        return result.data;
+      }
+      throw new Error(result.error || 'Failed to fetch announcements');
     },
-    {
-      id: 2,
-      title: 'Library Hours Extended During Finals',
-      content: 'The library will be open 24/7 during the final exam period from May 15-30 to support student studying...',
-      category: 'Campus',
-      priority: 'Medium',
-      status: 'Published',
-      publishDate: '2024-02-10',
-      expiryDate: '2024-05-30',
-      views: 856,
-      author: 'Library Services',
-      targetAudience: 'All Students',
-      isPinned: false
-    },
-    {
-      id: 3,
-      title: 'New Student Orientation Schedule',
-      content: 'Orientation sessions for new students will be held on the following dates. All new students must attend...',
-      category: 'Student Services',
-      priority: 'High',
-      status: 'Draft',
-      publishDate: null,
-      expiryDate: '2024-09-01',
-      views: 0,
-      author: 'Student Affairs',
-      targetAudience: 'New Students',
-      isPinned: false
-    },
-    {
-      id: 4,
-      title: 'Campus Maintenance Notice',
-      content: 'Scheduled maintenance of the main building elevator will take place this weekend. Please use alternative routes...',
-      category: 'Facilities',
-      priority: 'Low',
-      status: 'Published',
-      publishDate: '2024-02-08',
-      expiryDate: '2024-02-25',
-      views: 234,
-      author: 'Facilities Management',
-      targetAudience: 'All Users',
-      isPinned: false
-    },
-    {
-      id: 5,
-      title: 'Scholarship Application Deadline',
-      content: 'Applications for merit-based scholarships for Fall 2024 must be submitted by April 30th. Required documents include...',
-      category: 'Financial Aid',
-      priority: 'High',
-      status: 'Scheduled',
-      publishDate: '2024-03-01',
-      expiryDate: '2024-04-30',
-      views: 0,
-      author: 'Financial Aid Office',
-      targetAudience: 'All Students',
-      isPinned: false
-    }
-  ];
+  });
 
-  const announcementStats = [
-    {
-      label: 'Total Announcements',
-      value: '156',
-      change: '+12',
-      icon: Megaphone,
-      color: 'text-blue-600'
-    },
-    {
-      label: 'Published',
-      value: '134',
-      change: '+8',
-      icon: CheckCircle,
-      color: 'text-green-600'
-    },
-    {
-      label: 'Draft',
-      value: '15',
-      change: '+3',
-      icon: Edit3,
-      color: 'text-yellow-600'
-    },
-    {
-      label: 'Total Views',
-      value: '25.4K',
-      change: '+18%',
-      icon: Eye,
-      color: 'text-purple-600'
-    }
-  ];
+  const announcements = announcementsData?.items || [];
 
-  const categories = [
-    'All Categories',
-    'Academic',
-    'Campus',
-    'Student Services',
-    'Facilities',
-    'Financial Aid',
-    'Emergency'
-  ];
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: 'published' | 'draft' | 'scheduled') => {
     switch (status) {
-      case 'Published':
-        return <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-          <CheckCircle className="w-3 h-3" />
-          Published
-        </Badge>;
-      case 'Draft':
-        return <Badge className="bg-gray-100 text-gray-800 flex items-center gap-1">
-          <Edit3 className="w-3 h-3" />
-          Draft
-        </Badge>;
-      case 'Scheduled':
-        return <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          Scheduled
-        </Badge>;
-      case 'Expired':
-        return <Badge className="bg-red-100 text-red-800 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" />
-          Expired
-        </Badge>;
+      case 'published':
+        return <Badge className="bg-green-100 text-green-800">Published</Badge>;
+      case 'draft':
+        return <Badge variant="secondary">Draft</Badge>;
+      case 'scheduled':
+        return <Badge className="bg-blue-100 text-blue-800">Scheduled</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -178,14 +86,16 @@ export default function AnnouncementsPage() {
 
   return (
     <AdminLayout>
-      <PageHeader 
+      <PageHeader
+        breadcrumbs={[{ label: 'Announcements' }]}
+        subtitle="Create and manage campus news and announcements"
         actions={
           <div className="flex gap-2">
-            <Button variant="outline">
-              <Send className="w-4 h-4 mr-2" />
-              Send Email
-            </Button>
-            <Button>
+            <Button 
+              size="sm" 
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+              onClick={() => setIsCreateDialogOpen(true)}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Create Announcement
             </Button>
@@ -193,135 +103,361 @@ export default function AnnouncementsPage() {
         }
       />
 
-      <div className="space-y-6">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {announcementStats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={index}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
+      <div className="p-6 space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="news">News & Announcements</TabsTrigger>
+            <TabsTrigger value="regulations">Regulations & Guides</TabsTrigger>
+          </TabsList>
+
+          {/* NEWS & ANNOUNCEMENTS TAB */}
+          <TabsContent value="news" className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="w-5 h-5 text-blue-600" />
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                      <p className="text-2xl font-bold text-foreground mt-2">{stat.value}</p>
-                      <p className="text-sm text-green-600 mt-1">{stat.change} this month</p>
-                    </div>
-                    <div className={`p-3 rounded-full bg-muted ${stat.color}`}>
-                      <Icon className="h-6 w-6" />
+                      <p className="text-sm text-muted-foreground">Total Announcements</p>
+                      <p className="text-xl font-semibold">{announcementsData?.total || 0}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
-        </div>
 
-        {/* Announcement Management */}
-        <Card>
-          <CardHeader>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Published</p>
+                      <p className="text-xl font-semibold">
+                        {announcements.filter((a: Announcement) => a.is_published).length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Edit className="w-5 h-5 text-yellow-600" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Drafts</p>
+                      <p className="text-xl font-semibold">
+                        {announcements.filter((a: Announcement) => !a.is_published).length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-purple-600" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Views</p>
+                      <p className="text-xl font-semibold">0</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Search and Filter */}
+            <div className="flex items-center justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+                <Input 
+                  placeholder="Search announcements..." 
+                  className="pl-10"
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+              </Button>
+            </div>
+
+            {/* Card Grid */}
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading...</div>
+            ) : announcements.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">No announcements found</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {announcements.map((announcement: Announcement) => (
+                  <Card key={announcement.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        {getStatusBadge(announcement.is_published ? 'published' : 'draft')}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedAnnouncement(announcement);
+                                setIsViewDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedAnnouncement(announcement);
+                                setIsEditDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => {
+                                setSelectedAnnouncement(announcement);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <CardTitle className="text-lg line-clamp-2">{announcement.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                        {announcement.content}
+                      </p>
+                      
+                      <div className="space-y-3">
+                        {/* Priority & Target Audience */}
+                        <div className="flex flex-wrap gap-1">
+                          {getPriorityBadge(announcement.priority)}
+                          <Badge variant="outline" className="text-xs">
+                            <Users className="w-3 h-3 mr-1" />
+                            {announcement.target_audience}
+                          </Badge>
+                        </div>
+                        
+                        {/* Date */}
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(announcement.created_at).toLocaleDateString()}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            0 views
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* REGULATIONS & GUIDES TAB */}
+          <TabsContent value="regulations" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Announcement Management</CardTitle>
-                <CardDescription>Create and manage campus announcements</CardDescription>
+                <h3 className="text-lg font-semibold">Official Documents</h3>
+                <p className="text-sm text-muted-foreground">Academic policies, regulations, and service guides</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filter
-                </Button>
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search announcements..." 
-                    className="pl-10 w-64"
-                  />
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Category Filter */}
-            <div className="flex gap-2 mb-6 overflow-x-auto">
-              {categories.map((category, index) => (
-                <Button 
-                  key={index}
-                  variant={index === 0 ? "default" : "outline"}
-                  size="sm"
-                  className="whitespace-nowrap"
-                >
-                  {category}
-                </Button>
-              ))}
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Upload Document
+              </Button>
             </div>
 
-            <div className="space-y-4">
-              {mockAnnouncements.map((announcement) => (
-                <div key={announcement.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      {announcement.isPinned && (
-                        <Pin className="w-4 h-4 text-blue-600" />
-                      )}
-                      <h3 className="text-sm font-medium text-foreground">
-                        {announcement.title}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getPriorityBadge(announcement.priority)}
-                      {getStatusBadge(announcement.status)}
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                    {announcement.content}
-                  </p>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {announcement.targetAudience}
-                      </span>
-                      <span>•</span>
-                      <span>{announcement.category}</span>
-                      <span>•</span>
-                      <span>By {announcement.author}</span>
-                      {announcement.publishDate && (
-                        <>
-                          <span>•</span>
-                          <span>Published: {announcement.publishDate}</span>
-                        </>
-                      )}
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3 h-3" />
-                        {announcement.views} views
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                      <CardTitle className="text-lg">Academic Policies & Procedures</CardTitle>
                     </div>
-
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Edit3 className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Calendar className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Replace
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge>Regulation</Badge>
+                      <Badge variant="outline">Academic</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Official academic policies and procedures for students and faculty
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Updated: 2024-07-15</span>
+                      <span>2,341 downloads</span>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
 
-        {/* Quick Actions */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-green-600" />
+                      <CardTitle className="text-lg">Student Code of Conduct</CardTitle>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Replace
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge>Regulation</Badge>
+                      <Badge variant="outline">Student Life</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Official code of conduct and behavioral expectations for students
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Updated: 2024-06-20</span>
+                      <span>1,876 downloads</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-purple-600" />
+                      <CardTitle className="text-lg">How to Request Transcripts</CardTitle>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Replace
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Service Guide</Badge>
+                      <Badge variant="outline">Student Services</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Step-by-step guide for requesting official transcripts
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Updated: 2024-08-01</span>
+                      <span>987 downloads</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-orange-600" />
+                      <CardTitle className="text-lg">Financial Aid Application Guide</CardTitle>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Replace
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Service Guide</Badge>
+                      <Badge variant="outline">Financial Aid</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Complete guide for applying for financial aid and scholarships
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Updated: 2024-07-25</span>
+                      <span>1,234 downloads</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Quick Actions - Below tabs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
@@ -363,6 +499,32 @@ export default function AnnouncementsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Create Announcement Dialog */}
+      <CreateAnnouncementDialog 
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+
+      {/* Edit Announcement Dialog */}
+      <EditAnnouncementDialog 
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        announcement={selectedAnnouncement}
+      />
+
+      {/* Delete Announcement Dialog */}
+      <DeleteAnnouncementDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        announcement={selectedAnnouncement}
+      />
+
+      <ViewAnnouncementDialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+        announcement={selectedAnnouncement}
+      />
     </AdminLayout>
   );
 }

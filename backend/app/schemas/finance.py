@@ -17,8 +17,8 @@ class FeeStructureBase(BaseSchema):
     name: str = Field(..., description="Fee name", example="Tuition Fee - Computing")
     description: Optional[str] = Field(None, description="Fee description")
     amount: Decimal = Field(..., description="Fee amount in VND", ge=0)
-    major_id: Optional[int] = Field(None, description="Major ID (null for common fees)")
-    campus_id: Optional[int] = Field(None, description="Campus ID (null for all campuses)")
+    major_code: Optional[str] = Field(None, description="Major code (null for common fees)", max_length=10)
+    campus_code: Optional[str] = Field(None, description="Campus code (null for all campuses)", max_length=10)
     year_applicable: Optional[int] = Field(None, description="Year applicable (null for all years)")
     is_active: bool = Field(True, description="Whether fee is currently active")
 
@@ -49,20 +49,20 @@ class FeeStructureResponse(FeeStructureBase):
 class InvoiceBase(BaseSchema):
     """Base invoice schema"""
     student_id: int = Field(..., description="Student user ID")
-    semester_id: int = Field(..., description="Semester ID")
+    semester_id: Optional[int] = Field(None, description="Semester ID")
     invoice_number: str = Field(..., description="Unique invoice number", example="INV202401001")
     total_amount: Decimal = Field(..., description="Total invoice amount", ge=0)
     paid_amount: Decimal = Field(0, description="Amount paid so far", ge=0)
     due_date: date_type = Field(..., description="Payment due date")
-    status: str = Field("pending", description="Invoice status", pattern="^(pending|paid|overdue|cancelled)$")
+    status: str = Field("pending", description="Invoice status", pattern="^(pending|partial|paid|overdue|cancelled)$")
 
 
 class InvoiceCreate(BaseSchema):
     """Create invoice request"""
     student_id: int
-    semester_id: int
+    semester_code: str = Field(..., description="Semester code (e.g., F2024, S2025)")
     invoice_number: str
-    issue_date: date_type
+    issue_date: date_type  # Keep as issue_date for input (router maps to issued_date in DB)
     due_date: date_type
     status: Optional[str] = Field("pending", pattern="^(pending|partial|paid|overdue|cancelled)$")
     notes: Optional[str] = None
@@ -80,13 +80,14 @@ class InvoiceCreate(BaseSchema):
 class InvoiceUpdate(BaseSchema):
     """Update invoice request"""
     due_date: Optional[date_type] = None
-    status: Optional[str] = Field(None, pattern="^(pending|paid|overdue|cancelled)$")
+    status: Optional[str] = Field(None, pattern="^(pending|partial|paid|overdue|cancelled)$")
     notes: Optional[str] = None
 
 
 class InvoiceResponse(InvoiceBase):
     """Invoice response"""
     id: int
+    issued_date: date_type  # Added issued_date field (database column name)
     balance: Decimal = Field(..., description="Remaining balance (total - paid)")
     notes: Optional[str] = None
     created_at: datetime
@@ -107,7 +108,7 @@ class InvoiceWithLinesResponse(InvoiceResponse):
 class InvoiceLineBase(BaseSchema):
     """Base invoice line schema"""
     invoice_id: int = Field(..., description="Invoice ID")
-    fee_structure_id: int = Field(..., description="Fee structure ID")
+    fee_structure_id: Optional[int] = Field(None, description="Fee structure ID")
     description: str = Field(..., description="Line item description")
     quantity: int = Field(1, description="Quantity", ge=1)
     unit_price: Decimal = Field(..., description="Unit price", ge=0)
@@ -149,7 +150,8 @@ class PaymentBase(BaseSchema):
     amount: Decimal = Field(..., description="Payment amount", gt=0)
     payment_method: str = Field(..., description="Payment method", 
                                  pattern="^(cash|bank_transfer|card|e_wallet|momo|vnpay)$")
-    reference: Optional[str] = Field(None, description="Payment reference/transaction ID")
+    transaction_id: Optional[str] = Field(None, description="Payment transaction ID")
+    status: str = Field("completed", description="Payment status")
     notes: Optional[str] = Field(None, description="Payment notes")
 
 
@@ -163,14 +165,15 @@ class PaymentCreate(BaseSchema):
         description="Payment method",
         pattern="^(cash|bank_transfer|card|e_wallet|momo|vnpay)$"
     )
-    transaction_reference: Optional[str] = Field(None, description="Transaction reference/ID")
+    transaction_id: Optional[str] = Field(None, description="Transaction ID")
+    status: Optional[str] = Field("completed", description="Payment status", pattern="^(pending|completed|failed|refunded)$")
     notes: Optional[str] = Field(None, description="Payment notes")
 
 
 class PaymentResponse(PaymentBase):
     """Payment response"""
     id: int
-    payment_date: datetime = Field(..., description="Payment timestamp")
+    payment_date: datetime = Field(..., description="Payment timestamp")  # Changed from paid_at to payment_date
     processed_by_id: Optional[int] = Field(None, description="Staff user ID who processed payment")
     created_at: datetime
 

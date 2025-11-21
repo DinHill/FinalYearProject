@@ -1,9 +1,15 @@
-"use client";
+ "use client";
 
-import { ChevronRight } from "lucide-react";
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { generateBreadcrumbs, getPageTitle, getPageSubtitle } from '@/lib/navigation';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface Breadcrumb {
   label: string;
@@ -37,25 +43,24 @@ export function PageHeader({
       <div className="px-6 py-4">
         {/* Breadcrumbs */}
         {finalBreadcrumbs && finalBreadcrumbs.length > 0 && (
-          <nav className="flex items-center space-x-1 text-sm text-muted-foreground mb-2">
-            {finalBreadcrumbs.map((breadcrumb, index) => (
-              <div key={index} className="flex items-center">
-                {index > 0 && <ChevronRight className="w-4 h-4 mx-1" />}
-                {breadcrumb.href ? (
-                  <Link
-                    href={breadcrumb.href}
-                    className="hover:text-foreground transition-colors"
-                  >
-                    {breadcrumb.label}
-                  </Link>
-                ) : (
-                  <span className={index === finalBreadcrumbs.length - 1 ? "text-foreground font-medium" : ""}>
-                    {breadcrumb.label}
-                  </span>
-                )}
-              </div>
-            ))}
-          </nav>
+          <Breadcrumb className="mb-3">
+            <BreadcrumbList>
+              {finalBreadcrumbs.map((breadcrumb, index) => (
+                <div key={index} className="flex items-center">
+                  {index > 0 && <BreadcrumbSeparator />}
+                  <BreadcrumbItem>
+                    {index === finalBreadcrumbs.length - 1 ? (
+                      <BreadcrumbPage>{breadcrumb.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink href={breadcrumb.href || "#"}>
+                        {breadcrumb.label}
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </div>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
         )}
 
         {/* Custom content or Title and Actions */}

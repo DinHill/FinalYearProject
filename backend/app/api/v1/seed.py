@@ -12,7 +12,7 @@ import random
 from app.core.database import get_db
 from app.models.user import User, Campus, Major, UsernameSequence, StudentSequence, DeviceToken
 from app.models.academic import (
-    Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance,
+    Semester, Course, CourseSection, Enrollment, Assignment, Grade, Attendance,  # Removed Schedule
     SemesterType, AssignmentType, AttendanceStatus, GradeStatus, EnrollmentStatus
 )
 from app.models.finance import FeeStructure, Invoice, InvoiceLine, Payment, PaymentMethod, PaymentStatus
@@ -214,22 +214,36 @@ async def seed_course_sections(db: AsyncSession) -> Dict:
 
 
 async def seed_schedules(db: AsyncSession) -> Dict:
+    """
+    Update course sections with schedule data stored as JSONB
+    Note: Schedules are now stored in course_sections.schedules column, not a separate table
+    """
     sections = (await db.execute(select(CourseSection))).scalars().all()
-    days = [1, 2, 3, 4, 5]  # 1=Monday through 5=Friday
-    times = [(time(8,0), time(10,0)), (time(10,0), time(12,0)), (time(13,0), time(15,0))]
-    data = []
-    for i, s in enumerate(sections):
-        day = days[i%len(days)]
-        st, et = times[i%len(times)]
-        data.append({"section_id": s.id, "day_of_week": day, "start_time": st, "end_time": et, "room": s.room, "building": "A"})
-    created = 0
-    for d in data:
-        q = await db.execute(select(Schedule).where(Schedule.section_id==d["section_id"], Schedule.day_of_week==d["day_of_week"]))
-        if not q.scalar_one_or_none():
-            db.add(Schedule(**d))
-            created += 1
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    times = [
+        {"start_time": "08:00", "end_time": "10:00"},
+        {"start_time": "10:00", "end_time": "12:00"},
+        {"start_time": "13:00", "end_time": "15:00"}
+    ]
+    
+    updated = 0
+    for i, section in enumerate(sections):
+        if not section.schedules:  # Only update if no schedule exists
+            day = days[i % len(days)]
+            time_slot = times[i % len(times)]
+            
+            # Store schedule as JSONB array
+            section.schedules = [{
+                "day_of_week": day,
+                "start_time": time_slot["start_time"],
+                "end_time": time_slot["end_time"],
+                "room": section.room or "TBA",
+                "building": "A"
+            }]
+            updated += 1
+    
     await db.commit()
-    return {"entity": "schedules", "created": created, "total": len(data)}
+    return {"entity": "schedules", "updated_sections": updated, "total_sections": len(sections)}
 
 
 async def seed_enrollments(db: AsyncSession) -> Dict:

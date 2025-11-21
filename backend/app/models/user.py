@@ -1,7 +1,7 @@
 """
 User and authentication models
 """
-from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 import enum
@@ -12,10 +12,17 @@ class UserRole(str, enum.Enum):
     STUDENT = "student"
     TEACHER = "teacher"
     ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    ACADEMIC_ADMIN = "academic_admin"
+    FINANCE_ADMIN = "finance_admin"
+    SUPPORT_ADMIN = "support_admin"
+    REGISTRAR = "registrar"
+    PARENT = "parent"
 
 
 class UserStatus(str, enum.Enum):
     """User status enum"""
+    PENDING = "pending"      # Awaiting approval, not in Firebase yet
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
@@ -35,7 +42,7 @@ class User(BaseModel):
     __tablename__ = "users"
     
     # Identity
-    firebase_uid = Column(String(128), unique=True, nullable=False, index=True)
+    firebase_uid = Column(String(128), unique=True, nullable=True, index=True)  # Nullable for pending users
     username = Column(String(20), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     
@@ -51,7 +58,7 @@ class User(BaseModel):
     phone_number = Column(String(20))
     avatar_url = Column(String(500))
     date_of_birth = Column(Date)
-    # gender = Column(SQLEnum(Gender))  # Column doesn't exist in database yet
+    gender = Column(String(10))  # Changed from Enum to String to match database
     
     # Academic Context
     campus_id = Column(Integer, ForeignKey("campuses.id"), index=True)
@@ -64,15 +71,16 @@ class User(BaseModel):
     # Relationships
     user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     campus = relationship("Campus", back_populates="users")
-    major = relationship("Major", back_populates="users")
+    major = relationship("Major", back_populates="users", foreign_keys=[major_id])
     enrollments = relationship("Enrollment", back_populates="student", foreign_keys="[Enrollment.student_id]")
     taught_sections = relationship("CourseSection", back_populates="instructor")
-    grades = relationship("Grade", back_populates="student", foreign_keys="[Grade.student_id]")
-    attendance_records = relationship("Attendance", back_populates="student", foreign_keys="[Attendance.student_id]")
+    # grades relationship removed - Grade model uses enrollment_id, not student_id
+    # attendance_records = relationship("Attendance", back_populates="student", foreign_keys="[Attendance.student_id]")  # Removed: attendance references enrollment_id, not student_id
     invoices = relationship("Invoice", back_populates="student", foreign_keys="[Invoice.student_id]")
     document_requests = relationship("DocumentRequest", back_populates="student", foreign_keys="[DocumentRequest.student_id]")
-    support_tickets = relationship("SupportTicket", back_populates="requester", foreign_keys="[SupportTicket.requester_id]")
+    support_tickets = relationship("SupportTicket", back_populates="user", foreign_keys="[SupportTicket.user_id]")  # Changed from requester_id to user_id
     chat_participations = relationship("ChatParticipant", back_populates="user")
+    notifications = relationship("Notification", back_populates="user")
     
     def __repr__(self):
         return f"<User {self.username} ({self.role})>"
@@ -94,8 +102,8 @@ class Campus(BaseModel):
     
     # Relationships
     users = relationship("User", back_populates="campus")
-    course_sections = relationship("CourseSection", back_populates="campus")
-    announcements = relationship("Announcement", back_populates="campus")
+    # course_sections relationship removed - course_sections table doesn't have campus_id
+    # announcements relationship removed - announcements table doesn't have campus_id
     
     def __repr__(self):
         return f"<Campus {self.code} - {self.name}>"
@@ -112,10 +120,12 @@ class Major(BaseModel):
     # credits_required = Column(Integer, default=120)  # Column doesn't exist in database yet
     description = Column(String(1000))
     is_active = Column(Boolean, default=True)
+    coordinator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     # Relationships
-    users = relationship("User", back_populates="major")
+    users = relationship("User", back_populates="major", foreign_keys="[User.major_id]")
     courses = relationship("Course", back_populates="major")
+    coordinator = relationship("User", foreign_keys=[coordinator_id], uselist=False)
     
     def __repr__(self):
         return f"<Major {self.code} - {self.name}>"
@@ -153,11 +163,15 @@ class DeviceToken(BaseModel):
     
     __tablename__ = "device_tokens"
     
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    token = Column(String(255), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Token and device info
+    push_token = Column(Text, unique=True, nullable=False)  # Changed from token to match schema, changed to Text
     platform = Column(String(20), nullable=False)  # ios, android, web
+    device_info = Column(Text)  # Additional device information
+    
+    # Status
     is_active = Column(Boolean, default=True)
-    last_used_at = Column(DateTime(timezone=True))
     
     # Relationship
     user = relationship("User")

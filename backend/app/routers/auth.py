@@ -34,6 +34,7 @@ class UsernameToEmailRequest(BaseModel):
 class UsernameToEmailResponse(BaseModel):
     email: str
     full_name: str
+    role: str  # Added for admin portal validation
 
 
 @router.post(
@@ -78,16 +79,18 @@ async def username_to_email(
         
         return UsernameToEmailResponse(
             email=user.email,
-            full_name=user.full_name
+            full_name=user.full_name,
+            role=user.role
         )
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Username to email lookup error: {str(e)}", exc_info=True)
+        # Temporary: Return actual error for debugging
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Lookup failed"
+            detail=f"Lookup failed: {str(e)}"
         )
 
 

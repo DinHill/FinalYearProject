@@ -11,6 +11,7 @@ import time
 
 from app.core import settings, initialize_firebase, init_db, close_db
 from app.core.exceptions import APIException
+from app.middleware import AuditMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -75,6 +76,9 @@ app.add_middleware(
     expose_headers=["X-Request-ID", "X-Process-Time"],
 )
 
+# Audit Middleware - Log all significant API actions
+app.add_middleware(AuditMiddleware)
+
 
 # Request ID Middleware
 @app.middleware("http")
@@ -132,6 +136,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     for error in exc.errors():
         field = ".".join(str(loc) for loc in error["loc"])
         errors[field] = error["msg"]
+    
+    logger.error(f"❌ Validation error on {request.url}: {errors}")
     
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -201,18 +207,42 @@ from app.routers import (
 )
 from app.routers.admin_db import router as admin_db_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.dashboard_analytics import router as dashboard_analytics_router
 from app.routers.me import router as me_router
+from app.routers.settings import router as settings_router
+from app.routers.announcements import router as announcements_router
+from app.routers.search import router as search_router
+from app.routers.bulk import router as bulk_router
+from app.routers.schedule import router as schedule_router
+from app.routers.files import router as files_router
+from app.routers.student_portal import router as student_portal_router
+from app.routers.import_export import router as import_export_router
+from app.routers.campuses import router as campuses_router
 from app.api.v1.seed import router as seed_router
+from app.routers.test_campuses import router as test_campuses_router
+from app.routers.audit import router as audit_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(test_campuses_router, prefix="/api/v1")  # Test endpoint
 app.include_router(academic_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(support_router, prefix="/api/v1")
 app.include_router(admin_db_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(dashboard_analytics_router, prefix="/api/v1")
+app.include_router(settings_router, prefix="/api/v1")
+app.include_router(announcements_router, prefix="/api/v1")
+app.include_router(search_router, prefix="/api/v1")
+app.include_router(bulk_router, prefix="/api/v1")
+app.include_router(schedule_router, prefix="/api/v1")
+app.include_router(files_router, prefix="/api/v1")
+app.include_router(student_portal_router, prefix="/api/v1")
+app.include_router(import_export_router, prefix="/api/v1")
+app.include_router(campuses_router)  # Already has /api/v1/campuses prefix
 app.include_router(me_router, prefix="/api/v1")  # /me endpoints for mobile app
+app.include_router(audit_router, prefix="/api/v1")  # Audit logs
 app.include_router(seed_router)  # Seeding endpoint (should be protected in production)
 
 # More routers to be added:
@@ -229,3 +259,4 @@ if __name__ == "__main__":
         reload=settings.RELOAD,
         log_level=settings.LOG_LEVEL.lower()
     )
+

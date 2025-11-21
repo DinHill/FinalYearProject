@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Filter, Calendar, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -164,8 +165,44 @@ export function FilterBar({
                   <DropdownMenuSeparator />
                   
                   {group.type === "date" ? (
-                    <div className="p-2">
-                      <div className="text-sm text-muted-foreground mb-2">Date range filters coming soon</div>
+                    <div className="p-3 space-y-2">
+                      <div className="text-sm font-medium mb-2">Date Range</div>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground">From</label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            onChange={(e) => {
+                              const dateFilter: ActiveFilter = {
+                                groupId: group.id,
+                                groupLabel: group.label,
+                                optionId: "start_date",
+                                optionLabel: `From ${e.target.value}`,
+                                value: e.target.value
+                              };
+                              handleFilterToggle(group.id, { id: "start_date", label: `From ${e.target.value}`, value: e.target.value }, group.type);
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">To</label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            onChange={(e) => {
+                              const dateFilter: ActiveFilter = {
+                                groupId: group.id,
+                                groupLabel: group.label,
+                                optionId: "end_date",
+                                optionLabel: `To ${e.target.value}`,
+                                value: e.target.value
+                              };
+                              handleFilterToggle(group.id, { id: "end_date", label: `To ${e.target.value}`, value: e.target.value }, group.type);
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     group.options.map((option) => (

@@ -1,7 +1,7 @@
-"""
+﻿"""
 Document and content models
 """
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Enum as SQLEnum, BigInteger
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Enum as SQLEnum, BigInteger, text
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 import enum
@@ -71,32 +71,31 @@ class Document(BaseModel):
     __tablename__ = "documents"
     
     # Ownership
-    owner_id = Column(Integer, ForeignKey("users.id"), index=True)
-    section_id = Column(Integer, ForeignKey("course_sections.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
     
     # File Info
-    title = Column(String(200), nullable=False)
-    description = Column(Text)
-    file_path = Column(String(500), nullable=False)  # GCS object key
-    mime_type = Column(String(100), nullable=False)
-    file_size = Column(BigInteger, nullable=False)
-    file_hash = Column(String(64), index=True)  # SHA-256
+    title = Column(String(200))
+    document_type = Column(String(50))  # VARCHAR(50) in database
+    file_url = Column(String(500))
+    file_size = Column(Integer)
+    mime_type = Column(String(100))
     
-    # Classification
-    category = Column(SQLEnum(DocumentCategory), index=True)
-    visibility = Column(SQLEnum(DocumentVisibility), default=DocumentVisibility.PRIVATE)
+    # Course Material Linking
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)
+    description = Column(Text, nullable=True)
+    file_name = Column(String(255), nullable=True)
+    file_type = Column(String(100), nullable=True)
     
-    # Location Context
-    campus_id = Column(Integer, ForeignKey("campuses.id"))
+    # Status
+    status = Column(String(20))  # VARCHAR(20) in database
     
-    # Metadata
-    uploaded_at = Column(DateTime(timezone=True))
-    version = Column(Integer, default=1)
+    # Upload tracking
+    uploaded_by = Column(Integer, ForeignKey("users.id"))
     
     # Relationships
-    owner = relationship("User")
-    section = relationship("CourseSection")
-    campus = relationship("Campus")
+    user = relationship("User", foreign_keys=[user_id])
+    uploader = relationship("User", foreign_keys=[uploaded_by])
+    course = relationship("Course", foreign_keys=[course_id])
     
     def __repr__(self):
         return f"<Document {self.title}>"
@@ -109,13 +108,13 @@ class DocumentRequest(BaseModel):
     
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
-    # Request Info
-    document_type = Column(SQLEnum(DocumentRequestType), nullable=False, index=True)
+    # Request Info - using varchar to match database schema
+    document_type = Column(String(50), nullable=False, index=True)  # Changed from Enum to String
     purpose = Column(Text)
     copies_requested = Column(Integer, default=1)
     
     # Status Workflow
-    status = Column(SQLEnum(DocumentRequestStatus), default=DocumentRequestStatus.PENDING, index=True)
+    status = Column(String(20), default="pending", index=True)
     
     # Processing
     requested_at = Column(DateTime(timezone=True))
@@ -124,8 +123,8 @@ class DocumentRequest(BaseModel):
     ready_at = Column(DateTime(timezone=True))
     delivered_at = Column(DateTime(timezone=True))
     
-    # Delivery
-    delivery_method = Column(SQLEnum(DeliveryMethod))
+    # Delivery - using varchar to match database schema
+    delivery_method = Column(String(20))  # Changed from Enum to String
     delivery_address = Column(Text)
     tracking_number = Column(String(100))
     
@@ -151,31 +150,26 @@ class Announcement(BaseModel):
     
     # Content
     title = Column(String(200), nullable=False)
-    body = Column(Text, nullable=False)
-    summary = Column(String(500))
+    content = Column(Text, nullable=False)  # Matches database 'content' column
     
-    # Targeting
-    campus_id = Column(Integer, ForeignKey("campuses.id"), index=True)
-    major_id = Column(Integer, ForeignKey("majors.id"))
-    audience = Column(String(50), default="all")  # all, students, teachers, staff
-    
-    # Category
-    category = Column(SQLEnum(AnnouncementCategory), index=True)
-    priority = Column(SQLEnum(Priority), default=Priority.NORMAL)
-    
-    # Publishing
-    is_published = Column(Boolean, default=False, index=True)
-    is_pinned = Column(Boolean, default=False, index=True)
-    publish_at = Column(DateTime(timezone=True), index=True)
-    expire_at = Column(DateTime(timezone=True))
-    
-    # Author
+    # Targeting - using database column names
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    target_audience = Column(String(50), default="all")  # Matches database column name
+    
+    # Publishing - using database column names
+    is_published = Column(Boolean, default=False, index=True)
+    publish_date = Column(DateTime(timezone=True), index=True)  # Matches database column name
+    expire_date = Column(DateTime(timezone=True))  # Matches database column name
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=text('now()'))
+    updated_at = Column(DateTime(timezone=True), onupdate=text('now()'))
     
     # Relationships
-    campus = relationship("Campus", back_populates="announcements")
-    major = relationship("Major")
-    author = relationship("User")
+    author = relationship("User", foreign_keys=[author_id])
     
     def __repr__(self):
         return f"<Announcement {self.title}>"
+
+
+

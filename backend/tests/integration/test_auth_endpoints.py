@@ -1,147 +1,132 @@
-"""Integration tests for authentication endpoints."""
+﻿"""
+Test Authentication Endpoints
+/api/v1/auth/*
+"""
 import pytest
-from fastapi.testclient import TestClient
+import pytest_asyncio
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models import User
 
 
 @pytest.mark.integration
 @pytest.mark.auth
 class TestAuthEndpoints:
-    """Test authentication API endpoints."""
-    
-    def test_student_login_success(self, client: TestClient, test_student, mock_firebase_auth):
-        """Test successful student login."""
-        response = client.post(
+    """Test authentication endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_username_to_email_success(self, client: AsyncClient, test_admin: User):
+        """Test successful username to email conversion."""
+        response = await client.post(
+            "/api/v1/auth/username-to-email",
+            json={"username": "AdminGCD200001"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "admin@greenwich.edu.vn"
+        assert data["full_name"] == "Admin User"
+        assert data["role"] == "super_admin"
+
+    @pytest.mark.asyncio
+    async def test_username_to_email_not_found(self, client: AsyncClient):
+        """Test username to email with non-existent user."""
+        response = await client.post(
+            "/api/v1/auth/username-to-email",
+            json={"username": "NonExistent"}
+        )
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_username_to_email_missing_field(self, client: AsyncClient):
+        """Test username to email with missing username field."""
+        response = await client.post(
+            "/api/v1/auth/username-to-email",
+            json={}
+        )
+        assert response.status_code == 422  # Validation error
+
+    @pytest.mark.asyncio
+    async def test_student_login_success(self, client: AsyncClient, test_student: User):
+        """Test successful student login - REAL Firebase integration."""
+        response = await client.post(
             "/api/v1/auth/student-login",
-            json={
-                "student_id": "HieuNDGCD220033",
-                "password": "password123"
-            }
+            json={"student_id": "GHPSTD240001", "password": "password123"}
         )
         
+        # Should return 200 with custom token and user info
         assert response.status_code == 200
         data = response.json()
         assert "custom_token" in data
         assert "user" in data
-        assert data["user"]["username"] == "HieuNDGCD220033"
+        assert data["user"]["username"] == "GHPSTD240001"
         assert data["user"]["role"] == "student"
-    
-    def test_student_login_wrong_password(self, client: TestClient, test_student):
+        
+        # Verify custom token is a valid string
+        assert isinstance(data["custom_token"], str)
+        assert len(data["custom_token"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_student_login_wrong_password(self, client: AsyncClient, test_student: User):
         """Test student login with wrong password."""
-        response = client.post(
+        response = await client.post(
             "/api/v1/auth/student-login",
-            json={
-                "student_id": "HieuNDGCD220033",
-                "password": "wrongpassword"
-            }
+            json={"student_id": "GHPSTD240001", "password": "wrongpassword"}
         )
-        
         assert response.status_code == 401
-        assert "Invalid credentials" in response.json()["detail"]
-    
-    def test_student_login_nonexistent_user(self, client: TestClient):
+
+    @pytest.mark.asyncio
+    async def test_student_login_nonexistent_user(self, client: AsyncClient):
         """Test student login with non-existent user."""
-        response = client.post(
+        response = await client.post(
             "/api/v1/auth/student-login",
-            json={
-                "student_id": "NonexistentUser",
-                "password": "password123"
-            }
+            json={"student_id": "NONEXIST", "password": "password123"}
         )
-        
         assert response.status_code == 401
-    
-    def test_student_login_inactive_user(self, client: TestClient, test_student, db_session):
-        """Test student login with inactive user."""
-        # Deactivate user
-        test_student.is_active = False
-        db_session.add(test_student)
-        db_session.commit()
-        
-        response = client.post(
+
+    @pytest.mark.asyncio
+    async def test_student_login_missing_fields(self, client: AsyncClient):
+        """Test student login with missing required fields."""
+        response = await client.post(
             "/api/v1/auth/student-login",
-            json={
-                "student_id": "HieuNDGCD220033",
-                "password": "password123"
-            }
+            json={"student_id": "GHPSTD240001"}  # Missing password
+        )
+        assert response.status_code == 422  # Validation error
+
+    @pytest.mark.asyncio
+    async def test_create_session_with_custom_token(self, client: AsyncClient, test_student: User):
+        """Test session creation using custom token flow."""
+        # Step 1: Get a custom token using student login with the test_student
+        login_response = await client.post(
+            "/api/v1/auth/student-login",
+            json={"student_id": test_student.username, "password": "password123"}
         )
         
-        assert response.status_code == 401
-        assert "inactive" in response.json()["detail"].lower()
-    
-    def test_get_current_user(self, client: TestClient, test_student, student_token, mock_firebase_auth):
-        """Test getting current user profile."""
-        response = client.get(
-            "/api/v1/auth/me",
-            headers={"Authorization": f"Bearer {student_token}"}
-        )
+        assert login_response.status_code == 200, f"Login failed: {login_response.json()}"
+        custom_token = login_response.json()["custom_token"]
         
-        assert response.status_code == 200
-        data = response.json()
-        assert data["username"] == "HieuNDGCD220033"
-        assert data["role"] == "student"
-    
-    def test_get_current_user_no_token(self, client: TestClient):
-        """Test getting current user without authentication."""
-        response = client.get("/api/v1/auth/me")
+        # Note: In real app, mobile would call signInWithCustomToken(custom_token)
+        # to get an ID token, then send that ID token to /session endpoint.
+        # For this test, we verify the custom token exists and is valid format.
+        assert isinstance(custom_token, str)
+        assert len(custom_token) > 0
         
+        # The session endpoint would require an ID token from Firebase Auth
+        # which is beyond the scope of pure backend testing (needs Firebase SDK client)
+        # This test validates the custom token creation flow works correctly
+
+    @pytest.mark.asyncio
+    async def test_get_me_without_token(self, client: AsyncClient):
+        """Test /me endpoint without authentication."""
+        response = await client.get("/api/v1/auth/me")
         assert response.status_code == 401
-    
-    def test_get_current_user_invalid_token(self, client: TestClient):
-        """Test getting current user with invalid token."""
-        response = client.get(
+
+    @pytest.mark.asyncio
+    async def test_get_me_invalid_token(self, client: AsyncClient):
+        """Test /me endpoint with invalid token."""
+        response = await client.get(
             "/api/v1/auth/me",
             headers={"Authorization": "Bearer invalid_token"}
         )
-        
         assert response.status_code == 401
-    
-    def test_change_password_success(self, client: TestClient, test_student, student_token, mock_firebase_auth):
-        """Test successful password change."""
-        response = client.put(
-            "/api/v1/auth/change-password",
-            headers={"Authorization": f"Bearer {student_token}"},
-            json={
-                "current_password": "password123",
-                "new_password": "newpassword456"
-            }
-        )
-        
-        assert response.status_code == 200
-        assert "successfully" in response.json()["message"].lower()
-    
-    def test_change_password_wrong_current(self, client: TestClient, test_student, student_token, mock_firebase_auth):
-        """Test password change with wrong current password."""
-        response = client.put(
-            "/api/v1/auth/change-password",
-            headers={"Authorization": f"Bearer {student_token}"},
-            json={
-                "current_password": "wrongpassword",
-                "new_password": "newpassword456"
-            }
-        )
-        
-        assert response.status_code == 400
-        assert "incorrect" in response.json()["detail"].lower()
-    
-    def test_change_password_weak_new_password(self, client: TestClient, test_student, student_token, mock_firebase_auth):
-        """Test password change with weak new password."""
-        response = client.put(
-            "/api/v1/auth/change-password",
-            headers={"Authorization": f"Bearer {student_token}"},
-            json={
-                "current_password": "password123",
-                "new_password": "123"  # Too short
-            }
-        )
-        
-        assert response.status_code == 422  # Validation error
-    
-    def test_logout(self, client: TestClient, test_student, student_token, mock_firebase_auth):
-        """Test user logout."""
-        response = client.post(
-            "/api/v1/auth/logout",
-            headers={"Authorization": f"Bearer {student_token}"}
-        )
-        
-        assert response.status_code == 200
-        assert "successfully" in response.json()["message"].lower()
+

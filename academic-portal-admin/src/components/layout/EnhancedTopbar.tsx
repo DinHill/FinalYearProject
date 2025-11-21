@@ -95,22 +95,22 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
 
   const getNotificationColor = (type: string) => {
     switch (type) {
-      case "urgent": return "bg-red-500";
-      case "warning": return "bg-yellow-500";
-      default: return "bg-blue-500";
+      case "urgent": return "bg-brand-red";
+      case "warning": return "bg-brand-amber";
+      default: return "bg-brand-blue";
     }
   };
 
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shadow-sm">
+      <div className="flex items-center justify-between px-4 h-24 bg-white">
         {/* Left side */}
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={onToggleSidebar}
-            className="text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="text-brand-text-light hover:text-brand-navy hover:bg-gray-100"
             title="Toggle sidebar"
           >
             <Menu className="w-4 h-4" />
@@ -118,7 +118,7 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
 
           {/* Global Search */}
           <div className="relative w-80 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <form onSubmit={handleSearch}>
               <input
                 id="global-search"
@@ -126,14 +126,14 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
                 placeholder="Search users, documents, courses... (⌘K or /)"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
-                className="w-full pl-9 pr-16 py-2 text-sm bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                className="w-full pl-9 pr-16 py-2 text-sm bg-gray-50 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none text-brand-text-dark"
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowCommandPalette(true)}
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 px-2 text-xs text-gray-500 hover:text-brand-blue"
                 title="Open command palette (⌘K)"
               >
                 <Command className="w-3 h-3" />
@@ -147,7 +147,7 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
           {/* Campus Selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1 border-border">
+              <Button variant="outline" size="sm" className="gap-1 border-brand-border hover:border-brand-blue hover:text-brand-blue">
                 <Building2 className="w-4 h-4" />
                 <span className="hidden sm:inline">
                   {campuses.find(c => c.id === currentCampus)?.name || "Main Campus"}
@@ -162,7 +162,7 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
                 <DropdownMenuItem
                   key={campus.id}
                   onClick={() => setCurrentCampus(campus.id)}
-                  className={currentCampus === campus.id ? "bg-accent" : ""}
+                  className={currentCampus === campus.id ? "bg-brand-blue/10 text-brand-blue" : ""}
                 >
                   {campus.name}
                 </DropdownMenuItem>
@@ -170,14 +170,14 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Quick Create */}
+          {/* Quick Create - CTA Button with Orange */}
           {allowedQuickCreate.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90">
+                <Button size="sm" className="gap-1 bg-brand-orange hover:bg-brand-orange/90 text-white font-button border-0">
                   <Plus className="w-4 h-4" />
                   <span className="hidden sm:inline">Create</span>
-                  <kbd className="hidden lg:inline ml-1 px-1 py-0.5 text-xs bg-primary-foreground/20 rounded">
+                  <kbd className="hidden lg:inline ml-1 px-1 py-0.5 text-xs bg-white/20 rounded">
                     N
                   </kbd>
                 </Button>
@@ -189,6 +189,7 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
                   <DropdownMenuItem 
                     key={option.id}
                     onClick={() => onQuickCreate(option.id)}
+                    className="hover:bg-brand-blue/10 hover:text-brand-blue"
                   >
                     {option.label}
                   </DropdownMenuItem>
@@ -200,10 +201,10 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="relative">
+              <Button variant="ghost" size="sm" className="relative text-brand-text-light hover:text-brand-blue hover:bg-gray-100">
                 <Bell className="w-4 h-4" />
                 {notifications.length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs bg-red-500 text-white">
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs bg-brand-amber text-brand-text-dark border-0 font-medium">
                     {notifications.length}
                   </Badge>
                 )}
@@ -212,24 +213,24 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
             <DropdownMenuContent align="end" className="w-80">
               <DropdownMenuLabel className="flex items-center justify-between">
                 Notifications
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-brand-blue">
                   Mark all read
                 </Button>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               
               {notifications.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
+                <div className="p-4 text-center text-sm text-brand-text-light">
                   No new notifications
                 </div>
               ) : (
                 <div className="max-h-64 overflow-auto">
                   {notifications.map((notification) => (
-                    <DropdownMenuItem key={notification.id} className="flex flex-col items-start py-3 cursor-pointer">
+                    <DropdownMenuItem key={notification.id} className="flex flex-col items-start py-3 cursor-pointer hover:bg-gray-50">
                       <div className="flex items-center gap-2 w-full">
                         <div className={`w-2 h-2 rounded-full ${getNotificationColor(notification.type)}`} />
-                        <span className="text-sm flex-1">{notification.message}</span>
-                        <span className="text-xs text-muted-foreground">{notification.time}</span>
+                        <span className="text-sm flex-1 text-brand-text-dark">{notification.message}</span>
+                        <span className="text-xs text-gray-400">{notification.time}</span>
                       </div>
                     </DropdownMenuItem>
                   ))}
@@ -237,7 +238,7 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
               )}
               
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-center justify-center">
+              <DropdownMenuItem className="text-center justify-center text-brand-blue">
                 View all notifications
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -246,37 +247,33 @@ export function EnhancedTopbar({ user, onSearch, onQuickCreate, onLogout, onTogg
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 px-2">
-                <div className="h-8 w-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+              <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-gray-100">
+                <div className="h-8 w-8 bg-brand-blue text-white rounded-full flex items-center justify-center text-sm font-medium">
                   {user.name.split(" ").map(n => n[0]).join("")}
                 </div>
                 <div className="hidden sm:flex flex-col items-start">
-                  <span className="text-sm font-medium">{user.name}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-sm font-medium text-brand-text-dark">{user.name}</span>
+                  <span className="text-xs text-brand-text-light">
                     {user.role.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
                   </span>
                 </div>
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3 h-3 text-gray-500" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.location.href = '/profile'} className="hover:bg-brand-blue/10 hover:text-brand-blue">
                 <User className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowCommandPalette(true)}>
+              <DropdownMenuItem onClick={() => setShowCommandPalette(true)} className="hover:bg-brand-blue/10 hover:text-brand-blue">
                 <Command className="w-4 h-4 mr-2" />
                 Command Palette
-                <kbd className="ml-auto px-1 py-0.5 text-xs bg-muted rounded">⌘K</kbd>
+                <kbd className="ml-auto px-1 py-0.5 text-xs bg-gray-100 rounded">⌘K</kbd>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600" onClick={onLogout}>
+              <DropdownMenuItem className="text-brand-red hover:bg-red-50" onClick={onLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
               </DropdownMenuItem>

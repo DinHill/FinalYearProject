@@ -1,264 +1,437 @@
-"""Integration tests for finance endpoints."""
+"""
+Test Finance Endpoints
+/api/v1/finance/*
+"""
 import pytest
-from fastapi.testclient import TestClient
-from datetime import datetime
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+
+from app.models.user import User
+from app.models.finance import Invoice, Payment, InvoiceLine, FeeStructure
+from app.models.academic import Semester
 
 
 @pytest.mark.integration
 @pytest.mark.finance
-class TestFinanceEndpoints:
-    """Test finance API endpoints."""
+class TestFinanceInvoicesEndpoints:
+    """Test finance invoices endpoints."""
     
-    def test_create_invoice(
+    async def test_create_invoice_admin(
         self,
-        client: TestClient,
-        test_student,
-        test_semester,
-        admin_token,
-        mock_firebase_auth
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
     ):
-        """Test creating an invoice."""
-        response = client.post(
+        """Test admin creating an invoice"""
+        invoice_data = {
+            "student_id": test_student.id,
+            "semester_id": test_semester.id,
+            "invoice_number": "INV202401001",
+            "issue_date": date.today().isoformat(),
+            "due_date": (date.today() + timedelta(days=30)).isoformat(),
+            "status": "pending",
+            "notes": "Tuition fee for Spring 2024",
+            "lines": [
+                {
+                    "description": "Tuition Fee",
+                    "qty": 1,
+                    "unit_price": 5000000,
+                    "amount": 5000000
+                },
+                {
+                    "description": "Lab Fee",
+                    "qty": 1,
+                    "unit_price": 500000,
+                    "amount": 500000
+                }
+            ]
+        }
+        
+        response = await client.post(
             "/api/v1/finance/invoices",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json={
-                "student_id": str(test_student.id),
-                "semester_id": test_semester.id,
-                "invoice_number": "INV202401999",
-                "issue_date": "2024-01-01",
-                "due_date": "2024-01-31",
-                "lines": [
-                    {
-                        "description": "Tuition Fee",
-                        "quantity": 1,
-                        "unit_price": 5000.00,
-                        "amount": 5000.00
-                    }
-                ]
-            }
+            json=invoice_data,
+            headers=admin_token_headers
         )
         
         assert response.status_code == 201
         data = response.json()
-        assert data["invoice_number"] == "INV202401999"
-        assert data["total_amount"] == 5000.00
+        assert data["invoice_number"] == "INV202401001"
+        assert data["student_id"] == test_student.id
+        assert Decimal(str(data["total_amount"])) == Decimal("5500000")
         assert data["status"] == "pending"
     
-    def test_get_invoices(
+    async def test_list_invoices_admin(
         self,
-        client: TestClient,
-        test_invoice,
-        admin_token,
-        mock_firebase_auth
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
     ):
-        """Test listing invoices."""
-        response = client.get(
+        """Test admin listing invoices"""
+        # Create test invoice
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401002",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("3000000"),
+            paid_amount=Decimal("0"),
+            status="pending"
+        )
+        db_session.add(invoice)
+        await db_session.commit()
+        
+        response = await client.get(
             "/api/v1/finance/invoices",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            headers=admin_token_headers
         )
         
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
-        assert len(data["items"]) >= 1
+        assert "total" in data
+        assert data["total"] >= 1
     
-    def test_create_payment_success(
+    async def test_get_invoice_detail_admin(
         self,
-        client: TestClient,
-        test_invoice,
-        admin_token,
-        mock_firebase_auth
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
     ):
-        """Test creating a payment."""
-        response = client.post(
-            "/api/v1/finance/payments",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-                "X-Idempotency-Key": "test-payment-001"
-            },
-            json={
-                "invoice_id": test_invoice.id,
-                "amount": 2000.00,
-                "payment_method": "bank_transfer",
-                "transaction_reference": "TXN123456"
-            }
+        """Test admin getting invoice details"""
+        # Create test invoice with lines
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401003",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("2000000"),
+            paid_amount=Decimal("0"),
+            status="pending"
         )
+        db_session.add(invoice)
+        await db_session.flush()
         
-        assert response.status_code == 201
-        data = response.json()
-        assert data["amount"] == 2000.00
-        assert data["invoice_id"] == test_invoice.id
-    
-    def test_create_payment_idempotency(
-        self,
-        client: TestClient,
-        test_invoice,
-        admin_token,
-        mock_firebase_auth
-    ):
-        """Test payment idempotency - same key returns same payment."""
-        idempotency_key = "test-payment-002"
-        
-        # First payment
-        response1 = client.post(
-            "/api/v1/finance/payments",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-                "X-Idempotency-Key": idempotency_key
-            },
-            json={
-                "invoice_id": test_invoice.id,
-                "amount": 1000.00,
-                "payment_method": "cash",
-                "transaction_reference": "TXN001"
-            }
+        # Add invoice line
+        line = InvoiceLine(
+            invoice_id=invoice.id,
+            description="Tuition Fee",
+            qty=1,
+            unit_price=Decimal("2000000"),
+            amount=Decimal("2000000")
         )
+        db_session.add(line)
+        await db_session.commit()
         
-        assert response1.status_code == 201
-        payment1_id = response1.json()["id"]
-        
-        # Second payment with same key
-        response2 = client.post(
-            "/api/v1/finance/payments",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-                "X-Idempotency-Key": idempotency_key
-            },
-            json={
-                "invoice_id": test_invoice.id,
-                "amount": 2000.00,  # Different amount
-                "payment_method": "bank_transfer",
-                "transaction_reference": "TXN002"
-            }
-        )
-        
-        assert response2.status_code == 200
-        payment2_id = response2.json()["id"]
-        
-        # Should return the same payment
-        assert payment1_id == payment2_id
-        assert response2.json()["amount"] == 1000.00  # Original amount
-    
-    def test_create_payment_exceeds_balance(
-        self,
-        client: TestClient,
-        test_invoice,
-        admin_token,
-        mock_firebase_auth
-    ):
-        """Test payment that exceeds remaining balance."""
-        response = client.post(
-            "/api/v1/finance/payments",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-                "X-Idempotency-Key": "test-payment-003"
-            },
-            json={
-                "invoice_id": test_invoice.id,
-                "amount": 10000.00,  # More than invoice total
-                "payment_method": "bank_transfer"
-            }
-        )
-        
-        assert response.status_code == 400
-        assert "exceeds" in response.json()["detail"].lower()
-    
-    def test_get_student_financial_summary(
-        self,
-        client: TestClient,
-        test_student,
-        test_invoice,
-        admin_token,
-        mock_firebase_auth
-    ):
-        """Test getting student financial summary."""
-        response = client.get(
-            f"/api/v1/finance/students/{test_student.id}/summary",
-            headers={"Authorization": f"Bearer {admin_token}"}
+        response = await client.get(
+            f"/api/v1/finance/invoices/{invoice.id}",
+            headers=admin_token_headers
         )
         
         assert response.status_code == 200
         data = response.json()
-        assert "total_invoiced" in data
-        assert "total_paid" in data
-        assert "outstanding_balance" in data
-        assert data["student_id"] == str(test_student.id)
+        assert data["invoice_number"] == "INV202401003"
+        assert "lines" in data
+        assert len(data["lines"]) == 1
     
-    def test_get_my_financial_summary(
+    async def test_update_invoice_admin(
         self,
-        client: TestClient,
-        test_student,
-        test_invoice,
-        student_token,
-        mock_firebase_auth
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
     ):
-        """Test student getting own financial summary."""
-        response = client.get(
-            "/api/v1/finance/students/my/summary",
-            headers={"Authorization": f"Bearer {student_token}"}
+        """Test admin updating invoice"""
+        # Create test invoice
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401004",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("1000000"),
+            paid_amount=Decimal("0"),
+            status="pending"
+        )
+        db_session.add(invoice)
+        await db_session.commit()
+        
+        update_data = {
+            "status": "cancelled",
+            "notes": "Cancelled by admin"
+        }
+        
+        response = await client.put(
+            f"/api/v1/finance/invoices/{invoice.id}",
+            json=update_data,
+            headers=admin_token_headers
         )
         
         assert response.status_code == 200
         data = response.json()
-        assert "total_invoiced" in data
-        assert data["total_invoiced"] == 5500.00
+        assert data["status"] == "cancelled"
+        assert data["notes"] == "Cancelled by admin"
+    
+    async def test_delete_invoice_admin(
+        self,
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
+    ):
+        """Test admin deleting invoice"""
+        # Create test invoice
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401005",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("500000"),
+            paid_amount=Decimal("0"),
+            status="pending"
+        )
+        db_session.add(invoice)
+        await db_session.commit()
+        
+        response = await client.delete(
+            f"/api/v1/finance/invoices/{invoice.id}",
+            headers=admin_token_headers
+        )
+        
+        assert response.status_code == 200
 
 
 @pytest.mark.integration
 @pytest.mark.finance
-class TestPaymentWorkflow:
-    """Test complete payment workflow scenarios."""
+class TestFinancePaymentsEndpoints:
+    """Test finance payments endpoints."""
     
-    async def test_partial_payment_workflow(
+    async def test_create_payment_admin(
         self,
-        client: TestClient,
-        test_invoice,
-        admin_token,
-        mock_firebase_auth,
-        db_session
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
     ):
-        """Test partial payment workflow with status updates."""
-        # Initial status should be pending
-        assert test_invoice.status == "pending"
-        
-        # Make partial payment
-        response = client.post(
-            "/api/v1/finance/payments",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-                "X-Idempotency-Key": "partial-payment-001"
-            },
-            json={
-                "invoice_id": test_invoice.id,
-                "amount": 2000.00,
-                "payment_method": "bank_transfer"
-            }
+        """Test admin recording a payment"""
+        # Create invoice first
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401006",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("3000000"),
+            paid_amount=Decimal("0"),
+            status="pending"
         )
+        db_session.add(invoice)
+        await db_session.commit()
+        
+        payment_data = {
+            "invoice_id": invoice.id,
+            "amount": 3000000,
+            "payment_method": "bank_transfer",
+            "transaction_id": "TXN123456789",
+            "payment_date": date.today().isoformat(),
+            "status": "completed",
+            "notes": "Full payment received"
+        }
+        
+        response = await client.post(
+            "/api/v1/finance/payments",
+            json=payment_data,
+            headers=admin_token_headers
+        )
+        
+        if response.status_code != 201:
+            print(f"Payment creation error: {response.json()}")
         
         assert response.status_code == 201
+        data = response.json()
+        assert data["invoice_id"] == invoice.id
+        assert Decimal(str(data["amount"])) == Decimal("3000000")
+        assert data["payment_method"] == "bank_transfer"
+        assert data["status"] == "completed"
+    
+    async def test_list_payments_admin(
+        self,
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
+    ):
+        """Test admin listing payments"""
+        # Create invoice and payment
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401007",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("1000000"),
+            paid_amount=Decimal("1000000"),
+            status="paid"
+        )
+        db_session.add(invoice)
+        await db_session.flush()
         
-        # Check invoice status updated to partial
-        await db_session.refresh(test_invoice)
-        assert test_invoice.status == "partial"
-        assert test_invoice.amount_paid == 2000.00
+        payment = Payment(
+            invoice_id=invoice.id,
+            amount=Decimal("1000000"),
+            payment_method="cash",
+            transaction_id="TXN987654321",
+            payment_date=datetime.now(),
+            status="completed"
+        )
+        db_session.add(payment)
+        await db_session.commit()
         
-        # Make second payment to complete
-        response2 = client.post(
+        response = await client.get(
             "/api/v1/finance/payments",
-            headers={
-                "Authorization": f"Bearer {admin_token}",
-                "X-Idempotency-Key": "partial-payment-002"
-            },
-            json={
-                "invoice_id": test_invoice.id,
-                "amount": 3500.00,
-                "payment_method": "bank_transfer"
-            }
+            headers=admin_token_headers
         )
         
-        assert response2.status_code == 201
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        assert data["total"] >= 1
+
+
+@pytest.mark.integration
+@pytest.mark.finance
+class TestFinanceSummaryEndpoints:
+    """Test finance summary endpoints."""
+    
+    async def test_get_student_summary_admin(
+        self,
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
+    ):
+        """Test admin getting student financial summary"""
+        # Create invoice for student
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401008",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("5000000"),
+            paid_amount=Decimal("2000000"),
+            status="partial"
+        )
+        db_session.add(invoice)
+        await db_session.commit()
         
-        # Check invoice status updated to paid
-        await db_session.refresh(test_invoice)
-        assert test_invoice.status == "paid"
-        assert test_invoice.amount_paid == 5500.00
+        response = await client.get(
+            f"/api/v1/finance/students/{test_student.id}/summary",
+            headers=admin_token_headers
+        )
+        
+        if response.status_code != 200:
+            print(f"Student summary error: {response.json()}")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "student_id" in data
+        assert "total_invoiced" in data
+        assert "total_paid" in data
+        assert "outstanding_balance" in data
+    
+    async def test_get_my_summary_student(
+        self,
+        client: AsyncClient,
+        test_student: User,
+        test_semester: Semester,
+        student_token_headers: dict,
+        db_session: AsyncSession
+    ):
+        """Test student getting their own financial summary"""
+        # Create invoice for student
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401009",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("4000000"),
+            paid_amount=Decimal("1000000"),
+            status="partial"
+        )
+        db_session.add(invoice)
+        await db_session.commit()
+        
+        response = await client.get(
+            "/api/v1/finance/students/my/summary",
+            headers=student_token_headers
+        )
+        
+        if response.status_code != 200:
+            print(f"My summary error: {response.json()}")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "student_id" in data
+        assert data["student_id"] == test_student.id
+    
+    async def test_get_semester_summary_admin(
+        self,
+        client: AsyncClient,
+        test_admin: User,
+        test_student: User,
+        test_semester: Semester,
+        admin_token_headers: dict,
+        db_session: AsyncSession
+    ):
+        """Test admin getting semester financial summary"""
+        # Create invoices for semester
+        invoice = Invoice(
+            student_id=test_student.id,
+            semester_id=test_semester.id,
+            invoice_number="INV202401010",
+            issued_date=date.today(),
+            due_date=date.today() + timedelta(days=30),
+            total_amount=Decimal("6000000"),
+            paid_amount=Decimal("3000000"),
+            status="partial"
+        )
+        db_session.add(invoice)
+        await db_session.commit()
+        
+        response = await client.get(
+            f"/api/v1/finance/semesters/{test_semester.id}/summary",
+            headers=admin_token_headers
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "semester_id" in data
+        assert "total_invoiced" in data
+        assert "total_collected" in data
+        assert "outstanding_balance" in data

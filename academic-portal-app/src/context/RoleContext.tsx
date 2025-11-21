@@ -1,6 +1,8 @@
-import React, { createContext, useCallback, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useMemo, useEffect, useContext } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useAuth } from './AuthContext';
 
-type UserRole = 'student' | 'teacher';
+type UserRole = 'student' | 'teacher' | 'admin';
 
 interface RoleContextValue {
   isAuthenticated: boolean;
@@ -16,32 +18,62 @@ export const RoleContext = createContext<RoleContextValue>({
   logout: () => {},
 });
 
+// Export useRole hook
+export const useRole = () => {
+  const context = useContext(RoleContext);
+  if (!context) {
+    throw new Error('useRole must be used within a RoleProvider');
+  }
+  return context;
+};
+
 export const RoleProvider = ({ children }: { children: React.ReactNode }) => {
-  const [role, setRole] = useState<UserRole | null>(null);
+  const { user, login: authLogin, logout: authLogout, loading } = useAuth();
+  
+  // Derive role from authenticated user
+  const role = user?.role as UserRole | null;
+  const isAuthenticated = !!user;
+
+  console.log('🎭 RoleContext state:', { isAuthenticated, role: role, userName: user?.full_name, loading });
 
   const login = useCallback(async (username: string, password: string) => {
-    // Demo accounts
-    if (username === 'HieuNDGCD220033' && password === 'Hieu@123456') {
-      setRole('student');
+    try {
+      await authLogin(username, password);
       return { ok: true };
+    } catch (error: any) {
+      return { ok: false, message: error.message || 'Login failed' };
     }
-    if (username === 'TeacherDemo' && password === 'Teacher@123456') {
-      setRole('teacher');
-      return { ok: true };
-    }
-    return { ok: false, message: 'Invalid credentials' };
-  }, []);
+  }, [authLogin]);
 
-  const logout = useCallback(() => {
-    setRole(null);
-  }, []);
+  const logout = useCallback(async () => {
+    await authLogout();
+  }, [authLogout]);
 
   const value = useMemo(
-    () => ({ isAuthenticated: !!role, role, login, logout }),
-    [role, login, logout],
+    () => ({ isAuthenticated, role, login, logout }),
+    [isAuthenticated, role, login, logout],
   );
+
+  // Don't render children until auth state is determined
+  if (loading) {
+    console.log('⏳ RoleProvider: Waiting for auth state...');
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1a73e8" />
+      </View>
+    );
+  }
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+});
 
 

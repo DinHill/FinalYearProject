@@ -1,24 +1,41 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../constants/theme';
-import HomeScreen from '../screens/dashboard/HomeScreen';
-import ScheduleScreen from '../screens/schedule/ScheduleScreen';
-import AIChatScreen from '../screens/chat/AIChatScreen';
+import TeacherHomeScreen from '../screens/teacher/TeacherHomeScreen';
+import TeacherScheduleScreen from '../screens/teacher/TeacherScheduleScreen';
+import AttendanceManagementScreen from '../screens/teacher/AttendanceManagementScreen';
+import GradeEntryScreen from '../screens/teacher/GradeEntryScreen';
+import MoreScreen from '../screens/more/MoreScreen';
+import AnnouncementsScreen from '../screens/announcements/AnnouncementsScreen';
+import DocumentsScreen from '../screens/documents/DocumentsScreen';
+import SupportScreen from '../screens/chat/SupportScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
+const MoreStack = createNativeStackNavigator();
 
-// For demo: reuse student Home/Schedule; can be replaced with teacher-specific screens later
+const MoreStackNavigator = () => (
+  <MoreStack.Navigator screenOptions={{ headerShown: false }}>
+    <MoreStack.Screen name="MoreHome" component={MoreScreen} />
+    <MoreStack.Screen name="Announcements" component={AnnouncementsScreen} />
+    <MoreStack.Screen name="Documents" component={DocumentsScreen} />
+    <MoreStack.Screen name="Support" component={SupportScreen} />
+    <MoreStack.Screen name="Profile" component={ProfileScreen} />
+  </MoreStack.Navigator>
+);
+
 const TeacherTabs = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({
       tabBarIcon: ({ color, size }) => {
         const map: Record<string, string> = {
           Dashboard: 'view-dashboard',
+          Attendance: 'clipboard-check',
+          Grades: 'pencil-box',
           Schedule: 'calendar',
-          'AI Chat': 'chat',
-          Profile: 'account',
+          More: 'menu',
         };
         return (
           <MaterialCommunityIcons name={map[route.name] || 'circle'} size={size} color={color} />
@@ -31,10 +48,11 @@ const TeacherTabs = () => (
       headerShown: false,
     })}
   >
-    <Tab.Screen name="Dashboard" component={HomeScreen} />
-    <Tab.Screen name="Schedule" component={ScheduleScreen} />
-    <Tab.Screen name="AI Chat" component={AIChatScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
+    <Tab.Screen name="Dashboard" component={TeacherHomeScreen} />
+    <Tab.Screen name="Attendance" component={AttendanceManagementScreen} />
+    <Tab.Screen name="Grades" component={GradeEntryScreen} />
+    <Tab.Screen name="Schedule" component={TeacherScheduleScreen} />
+    <Tab.Screen name="More" component={MoreStackNavigator} />
   </Tab.Navigator>
 );
 

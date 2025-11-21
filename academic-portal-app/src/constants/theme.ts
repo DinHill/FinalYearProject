@@ -1,3 +1,16 @@
+import { Dimensions, PixelRatio } from 'react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Base dimensions (iPhone 12/13/14 as reference: 390x844)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Scaling function for responsive sizing
+const scale = (size: number) => (SCREEN_WIDTH / BASE_WIDTH) * size;
+const verticalScale = (size: number) => (SCREEN_HEIGHT / BASE_HEIGHT) * size;
+const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+
 export const COLORS = {
   // Primary colors
   primary: '#1E3A8A', // Dark blue
@@ -30,15 +43,15 @@ export const COLORS = {
 };
 
 export const FONTS = {
-  // Font sizes
-  xs: 12,
-  sm: 14,
-  base: 16,
-  lg: 18,
-  xl: 20,
-  '2xl': 24,
-  '3xl': 30,
-  '4xl': 36,
+  // Font sizes (responsive)
+  xs: moderateScale(12),
+  sm: moderateScale(14),
+  base: moderateScale(16),
+  lg: moderateScale(18),
+  xl: moderateScale(20),
+  '2xl': moderateScale(24),
+  '3xl': moderateScale(30),
+  '4xl': moderateScale(36),
   
   // Font weights
   normal: '400',
@@ -49,21 +62,21 @@ export const FONTS = {
 };
 
 export const SPACING = {
-  xs: 4,
-  sm: 8,
-  base: 16,
-  lg: 24,
-  xl: 32,
-  '2xl': 48,
-  '3xl': 64,
+  xs: scale(4),
+  sm: scale(8),
+  base: scale(16),
+  lg: scale(24),
+  xl: scale(32),
+  '2xl': scale(48),
+  '3xl': scale(64),
 };
 
 export const BORDER_RADIUS = {
-  sm: 8,
-  base: 12,
-  lg: 16,
-  xl: 20,
-  '2xl': 24,
+  sm: scale(8),
+  base: scale(12),
+  lg: scale(16),
+  xl: scale(20),
+  '2xl': scale(24),
   full: 9999,
 };
 
@@ -90,3 +103,16 @@ export const SHADOWS = {
     elevation: 6,
   },
 };
+
+// Screen dimensions for responsive layouts
+export const SCREEN = {
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+  isSmall: SCREEN_WIDTH < 375,
+  isMedium: SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414,
+  isLarge: SCREEN_WIDTH >= 414,
+};
+
+// Helper functions
+export const wp = (percentage: number) => (SCREEN_WIDTH * percentage) / 100;
+export const hp = (percentage: number) => (SCREEN_HEIGHT * percentage) / 100;

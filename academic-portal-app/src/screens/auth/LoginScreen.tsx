@@ -1,23 +1,24 @@
-import React, { useContext, useState } from 'react';
-import { View, StyleSheet, Image, Platform, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Image, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../constants/theme';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
-import { RoleContext } from '../../context/RoleContext';
+import { useAuth } from '../../context/AuthContext';
 
 const LoginScreen = () => {
-  const [studentId, setStudentId] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('HieuNDGCD220033');
+  const [password, setPassword] = useState('Student@123');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useContext(RoleContext);
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleSignIn = async () => {
-    if (!studentId.trim()) {
-      setError('Please enter your Student ID');
+    if (!username.trim()) {
+      setError('Please enter your username');
       return;
     }
     if (!password.trim()) {
@@ -25,18 +26,17 @@ const LoginScreen = () => {
       return;
     }
     
-    const res = await login(studentId.trim(), password);
-    if (!res.ok) {
-      setError(res.message || 'Invalid credentials');
-      return;
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      await login(username.trim(), password);
+      // Navigation will be handled by auth state change
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials');
+    } finally {
+      setIsLoading(false);
     }
-    setError('');
-  };
-
-  const handleDemoLogin = () => {
-    setStudentId('demo');
-    setPassword('demo');
-    setError('');
   };
 
   return (
@@ -55,14 +55,14 @@ const LoginScreen = () => {
         {/* Login Card */}
         <View style={styles.loginCard}>
           <Text style={styles.welcomeText}>Welcome Back</Text>
-          <Text style={styles.subtitleText}>Sign in to your student account</Text>
+          <Text style={styles.subtitleText}>Sign in to your account</Text>
 
-          {/* Student ID Input */}
+          {/* Username Input */}
           <Input
-            label="Student ID"
-            placeholder="Enter your student ID"
-            value={studentId}
-            onChangeText={setStudentId}
+            label="Username"
+            placeholder="Enter your username"
+            value={username}
+            onChangeText={setUsername}
             autoCapitalize="none"
             style={styles.input}
           />
@@ -95,24 +95,20 @@ const LoginScreen = () => {
             <Text style={styles.errorText}>{error}</Text>
           ) : null}
 
-          {/* Demo Login Section */}
-          <View style={styles.demoContainer}>
-            <View style={styles.demoHeader}>
-              <View style={styles.checkmarkContainer}>
-                <MaterialCommunityIcons name="check" size={16} color={COLORS.white} />
-              </View>
-              <Text style={styles.demoTitle}>Demo Login:</Text>
-            </View>
-            <Text style={styles.demoText}>Use any student ID with password "demo"</Text>
-          </View>
-
           {/* Sign In Button */}
           <Button
-            title="Sign In"
+            title={isLoading ? 'Signing In...' : 'Sign In'}
             onPress={handleSignIn}
             fullWidth
+            disabled={isLoading}
             style={styles.signInButton}
           />
+          
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            </View>
+          )}
 
           {/* Forgot Password */}
           <TouchableOpacity style={styles.forgotPasswordContainer}>
@@ -213,34 +209,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.base,
   },
-  demoContainer: {
-    backgroundColor: COLORS.grayLight,
-    borderRadius: BORDER_RADIUS.base,
-    padding: SPACING.base,
-    marginBottom: SPACING.lg,
-  },
-  demoHeader: {
-    flexDirection: 'row',
+  loadingContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  checkmarkContainer: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  demoTitle: {
-    fontSize: FONTS.sm,
-    fontWeight: FONTS.bold as any,
-    color: COLORS.primary,
-  },
-  demoText: {
-    fontSize: FONTS.sm,
-    color: COLORS.grayDark,
+    marginBottom: SPACING.base,
   },
   signInButton: {
     marginBottom: SPACING.lg,

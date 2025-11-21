@@ -18,11 +18,7 @@ email-validator==2.2.0
 # Firebase Admin SDK
 firebase-admin==6.5.0
 
-# Google Cloud
-google-cloud-storage==2.18.0
-google-cloud-firestore==2.18.0
-
-# Cloudinary (File Storage Alternative)
+# Cloudinary (Optional - File Storage for Production)
 cloudinary==1.41.0
 
 # Authentication & Security
@@ -49,11 +45,19 @@ reportlab==4.2.0
 pypdf==5.0.0
 qrcode[pil]==8.0
 
+# Excel/CSV Processing
+pandas==2.2.0
+openpyxl==3.1.5
+
 # AI Integration
 openai==1.51.0
 
 # Email
 sendgrid==6.11.0
+aiosmtplib==3.0.1
+
+# SMS
+twilio==9.0.4
 
 # Testing
 pytest==8.3.0
@@ -73,6 +77,7 @@ pytz==2024.1
 # Monitoring & Logging
 sentry-sdk[fastapi]==2.14.0
 structlog==24.4.0
+psutil==6.0.0
 
 # Code Quality
 ruff==0.6.0

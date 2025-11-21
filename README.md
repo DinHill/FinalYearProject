@@ -1,266 +1,185 @@
-# 🎓 Academic Portal
+# 🎓 Academic Portal - Final Year Project
 
-A comprehensive academic management system with mobile app, web admin portal, and backend API.
+A comprehensive academic management system with mobile app, web admin portal, and RESTful API backend.
 
-> **📚 For detailed documentation, see [DOCUMENTATION.md](./DOCUMENTATION.md)**
+**Tech Stack:** FastAPI (Python) • Next.js 14 (TypeScript) • React Native (Expo)
 
-## 📱 Project Structure
+---
 
-```
-Final Year Project/
-├── 📱 academic-portal-app/     # React Native Mobile App
-├── 🌐 academic-portal-admin/   # Next.js Admin Web Portal
-├── 🚀 backend/                 # FastAPI Backend API
-├── 📖 DOCUMENTATION.md         # Complete technical documentation
-└── � README.md               # This file - Quick start guide
-```
+## 📖 Documentation
 
-## 🌐 Live Deployment
+**Complete documentation is available in the [`docs/`](./docs/) folder:**
 
-- **Backend API**: https://academic-portal-api.onrender.com
-- **API Docs**: https://academic-portal-api.onrender.com/docs
-- **Database**: PostgreSQL on Render (28 tables)
-- **Status**: ✅ Production Ready (Backend 95% complete)
+- 📚 **[Documentation Index](./docs/DOCUMENTATION_INDEX.md)** - Navigate all documentation
+- 🏗️ **[Project Architecture](./docs/PROJECT_ARCHITECTURE.md)** ⭐ **NEW** - Complete technical breakdown
+  - 200+ API endpoints across 23 routers
+  - 26 admin pages, 15 mobile screens
+  - Full tech stack & database schema
+- 🚀 **[Getting Started](./docs/GETTING_STARTED.md)** - Setup and installation guide
+- 📊 **[System Audit Report](./docs/SYSTEM_AUDIT_REPORT.md)** - Comprehensive system overview
+- 🔧 **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- 📝 **[API Reference](./docs/API_ENDPOINTS.md)** - Complete API documentation
+- 📋 **[Project Summary](./docs/PROJECT_SUMMARY_FOR_REPORT.md)** - For thesis/report writing
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 18+
 - Python 3.11+
+- PostgreSQL (or SQLite for local development)
 - Git
 
-### 1. Clone the Repository
+### Installation
 
 ```bash
-git clone https://github.com/yourusername/academic-portal.git
-cd academic-portal
+# Clone the repository
+git clone https://github.com/DinHill/FinalYearProject.git
+cd FinalYearProject
+
+# Start all services
+npm start
 ```
 
-### 2. Backend Setup
+This will start:
+
+- 🔧 Backend API at http://localhost:8000
+- 🌐 Admin Portal at http://localhost:3000
+
+### Stop Services
 
 ```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
-python app/main.py
+npm run stop
 ```
-
-### 3. Admin Portal Setup
-
-```bash
-cd academic-portal-admin
-npm install
-npm run dev
-```
-
-### 4. Mobile App Setup
-
-```bash
-cd academic-portal-app
-npm install
-npx expo start
-```
-
-## 🌐 Live Demo
-
-- **Backend API:** [https://your-api.onrender.com](https://your-api.onrender.com)
-- **Admin Portal:** [https://your-admin.vercel.app](https://your-admin.vercel.app)
-- **API Documentation:** [https://your-api.onrender.com/docs](https://your-api.onrender.com/docs)
-
-## 🔐 Demo Credentials
-
-**Admin Login:**
-
-- User ID: `A001`
-- Password: `admin123`
-
-**Teacher Login:**
-
-- User ID: `T001`
-- Password: `teacher123`
-
-**Student Login:**
-
-- User ID: `S001`
-- Password: `student123`
-
-## 🛠️ Tech Stack
-
-### Backend
-
-- **FastAPI** - Modern Python web framework
-- **SQLAlchemy** - Database ORM
-- **SQLite** - Database (PostgreSQL for production)
-- **JWT** - Authentication
-- **Uvicorn** - ASGI server
-
-### Admin Portal
-
-- **Next.js 15** - React framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
-- **React Query** - Data fetching
-- **React Hook Form** - Form management
-
-### Mobile App
-
-- **React Native** - Cross-platform mobile
-- **Expo** - Development platform
-- **TypeScript** - Type safety
-- **React Navigation** - Navigation
-
-## 📚 Features
-
-### 👨‍💼 Admin Features
-
-- Dashboard with analytics
-- User management (students, teachers)
-- Course and semester management
-- Schedule management
-- Grade oversight
-- System settings
-
-### 👨‍🏫 Teacher Features
-
-- Course management
-- Student enrollment
-- Assignment creation
-- Grade management
-- Schedule viewing
-- Chat with students
-
-### 👨‍🎓 Student Features
-
-- Course enrollment
-- Schedule viewing
-- Assignment submission
-- Grade checking
-- Chat with teachers
-- Academic calendar
-
-### 📱 Mobile Features
-
-- Cross-platform (iOS/Android)
-- Offline capability
-- Push notifications
-- Biometric login
-- Dark/Light theme
-
-## 🚀 Deployment
-
-### ✅ **Web Services (Can be deployed online):**
-
-#### Backend API (Render)
-
-1. Push to GitHub
-2. Connect to Render
-3. Deploy as web service
-4. Set environment variables
-
-#### Admin Portal (Vercel)
-
-1. Connect GitHub repo
-2. Deploy Next.js app
-3. Configure environment variables
-
-### 📱 **Mobile App (Cannot be deployed to web hosting):**
-
-**Distribution Options:**
-
-- **Development:** Expo Development Build (`npx expo start`)
-- **Testing:** Build APK with EAS (`eas build --platform android --profile preview`)
-- **Production:** App Store distribution (iOS/Android)
-
-**Note:** React Native apps require app store distribution or direct APK installation. They cannot be hosted on web platforms like Render/Vercel.
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
-
-## 🔧 Environment Variables
-
-### Backend (.env)
-
-```env
-ENVIRONMENT=development
-SECRET_KEY=your-secret-key
-DEBUG=true
-DATABASE_URL=sqlite:///./academic_portal.db
-```
-
-### Admin Portal (.env.local)
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_ENVIRONMENT=development
-```
-
-### Mobile App (.env)
-
-```env
-EXPO_PUBLIC_API_BASE_URL=http://localhost:8000
-EXPO_PUBLIC_ENVIRONMENT=development
-```
-
-## 📖 API Documentation
-
-The API documentation is automatically generated and available at:
-
-- Development: http://localhost:8000/docs
-- Production: https://your-api.onrender.com/docs
-
-## 🧪 Testing
-
-### Backend
-
-```bash
-cd backend
-pytest
-```
-
-### Frontend
-
-```bash
-cd academic-portal-admin
-npm test
-```
-
-### Mobile
-
-```bash
-cd academic-portal-app
-npm test
-```
-
-## 📝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Support
-
-If you have any questions or issues:
-
-- Create an issue on GitHub
-- Contact: your-email@example.com
-
-## 🎯 Roadmap
-
-- [ ] Real-time notifications
-- [ ] Video conferencing integration
-- [ ] Advanced analytics
-- [ ] Multi-campus support
-- [ ] API rate limiting
-- [ ] Advanced security features
 
 ---
 
-**Made with ❤️ for education**
+## 📁 Project Structure
+
+```
+FinalYearProject/
+├── backend/                    # FastAPI Backend (Python)
+│   ├── app/                   # Application code
+│   ├── requirements.txt       # Python dependencies
+│   └── README.md
+├── academic-portal-admin/      # Next.js Admin Web Portal
+│   ├── src/                   # Source code
+│   ├── package.json
+│   └── README.md
+├── academic-portal-app/        # React Native Mobile App
+│   ├── src/                   # Source code
+│   ├── package.json
+│   └── README.md
+├── docs/                       # 📚 All project documentation
+├── start-all.ps1              # Start all services
+├── stop-all.ps1               # Stop all services
+└── README.md                  # This file
+```
+
+---
+
+## 🎯 Key Features
+
+### ✅ Backend API (FastAPI)
+
+- 200+ REST API endpoints
+- JWT + Firebase authentication
+- Role-based access control (RBAC)
+- Multi-campus support
+- PostgreSQL database
+
+### ✅ Admin Web Portal (Next.js)
+
+- 26 admin pages
+- User management (students, teachers, admins)
+- Academic management (courses, programs, schedules)
+- Finance management (invoices, payments)
+- Analytics dashboard
+
+### ✅ Mobile App (React Native)
+
+- Student & teacher interfaces
+- Schedule viewing
+- Grade checking
+- Document access
+- Support tickets
+- Cross-platform (iOS/Android)
+
+---
+
+## 🔐 Test Credentials
+
+| Role        | Username          | Password     |
+| ----------- | ----------------- | ------------ |
+| Super Admin | `super_admin`     | `Test123!@#` |
+| Student     | `HieuNDGCD220001` | `Test123!@#` |
+| Teacher     | `teacher1`        | `Test123!@#` |
+
+---
+
+## 🌐 Live Deployment
+
+- **Backend API:** https://academic-portal-api.onrender.com
+- **API Docs:** https://academic-portal-api.onrender.com/docs
+- **Status:** ✅ Production Ready (85% complete)
+
+---
+
+## 🛠️ Technology Stack
+
+| Component     | Technologies                              |
+| ------------- | ----------------------------------------- |
+| **Backend**   | FastAPI, SQLAlchemy, PostgreSQL, Firebase |
+| **Admin Web** | Next.js 14, TypeScript, Tailwind CSS      |
+| **Mobile**    | React Native, Expo, TypeScript            |
+| **Auth**      | Firebase Authentication, JWT              |
+| **Database**  | PostgreSQL (Production), SQLite (Dev)     |
+
+---
+
+## 📊 System Statistics
+
+- **Total Endpoints:** 200+
+- **Admin Pages:** 26
+- **Mobile Screens:** 11
+- **Database Tables:** 30+
+- **User Roles:** 6 (Super Admin, Academic Admin, Finance Admin, Support Admin, Teacher, Student)
+- **Campuses:** Multi-campus support (4 campuses)
+
+---
+
+## 📝 Development
+
+For detailed development instructions, see:
+
+- [Getting Started Guide](./docs/GETTING_STARTED.md)
+- [Backend Setup](./backend/README.md)
+- [Admin Portal Setup](./academic-portal-admin/README.md)
+- [Mobile App Setup](./academic-portal-app/README.md)
+
+---
+
+## 🤝 Contributing
+
+See [Pre-Commit Checklist](./docs/PRE_COMMIT_CHECKLIST.md) for contribution guidelines.
+
+---
+
+## 📄 License
+
+This project is part of a Final Year Project at Greenwich University.
+
+---
+
+## 👨‍💻 Author
+
+**Dinh Hieu**
+
+- GitHub: [@DinHill](https://github.com/DinHill)
+- Repository: [FinalYearProject](https://github.com/DinHill/FinalYearProject)
+
+---
+
+**For complete documentation, visit the [`docs/`](./docs/) folder**

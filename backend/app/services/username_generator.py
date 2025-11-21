@@ -136,20 +136,18 @@ class UsernameGenerator:
     async def generate_teacher_username(
         db: AsyncSession,
         full_name: str,
-        campus_code: str
+        campus_code: str = None  # Not used anymore but kept for compatibility
     ) -> str:
         """
         Generate teacher username
         
-        Format: FirstNameLastInitialG{CampusCode}T
-        Example: JohnSGDT (John Smith, Da Nang, Teacher)
-        
-        With collision handling: JohnSGDT, JohnSGDT2, JohnSGDT3, etc.
+        Format: FirstNameLastInitial[number]
+        Example: JohnS, JohnS2, JohnS3 (John Smith)
         
         Args:
             db: Database session
             full_name: Teacher full name
-            campus_code: Campus code (H, D, C, S)
+            campus_code: Campus code (not used, kept for compatibility)
         
         Returns:
             Generated username
@@ -157,16 +155,16 @@ class UsernameGenerator:
         # Parse name
         first_name, last_initials = UsernameGenerator.parse_vietnamese_name(full_name)
         
-        # Build base username
-        base_username = f"{first_name}{last_initials}G{campus_code}T"
+        # Build base username (no campus code, no G, no T)
+        base_username = f"{first_name}{last_initials}"
         
-        # Handle collisions
+        # Handle collisions - add number if needed
         username = base_username
-        counter = 1
+        counter = 2  # Start from 2 for first collision
         
         while await UsernameGenerator._username_exists(db, username):
-            counter += 1
             username = f"{base_username}{counter}"
+            counter += 1
             
             if counter > 100:
                 raise ValueError("Too many username collisions")
@@ -180,19 +178,19 @@ class UsernameGenerator:
     async def generate_staff_username(
         db: AsyncSession,
         full_name: str,
-        campus_code: str,
+        campus_code: str = None,  # Not used anymore but kept for compatibility
         role: str = "staff"
     ) -> str:
         """
         Generate staff/admin username
         
-        Format: FirstNameLastInitialG{CampusCode}S
-        Example: MaryJGDS (Mary Johnson, Da Nang, Staff)
+        Format: FirstNameLastInitial[number]
+        Example: MaryJ, MaryJ2, MaryJ3 (Mary Johnson)
         
         Args:
             db: Database session
             full_name: Staff full name
-            campus_code: Campus code (H, D, C, S)
+            campus_code: Campus code (not used, kept for compatibility)
             role: Role type (staff, admin)
         
         Returns:
@@ -201,17 +199,16 @@ class UsernameGenerator:
         # Parse name
         first_name, last_initials = UsernameGenerator.parse_vietnamese_name(full_name)
         
-        # Build base username
-        role_suffix = "A" if role == "admin" else "S"
-        base_username = f"{first_name}{last_initials}G{campus_code}{role_suffix}"
+        # Build base username (no campus code, no G, no suffix)
+        base_username = f"{first_name}{last_initials}"
         
-        # Handle collisions
+        # Handle collisions - add number if needed
         username = base_username
-        counter = 1
+        counter = 2  # Start from 2 for first collision
         
         while await UsernameGenerator._username_exists(db, username):
-            counter += 1
             username = f"{base_username}{counter}"
+            counter += 1
             
             if counter > 100:
                 raise ValueError("Too many username collisions")
@@ -264,14 +261,7 @@ class UsernameGenerator:
             role: User role (student, teacher, admin, staff)
         
         Returns:
-            Email address
+            Email address (all users use @fpt.edu.vn)
         """
-        domain_map = {
-            "student": "student.greenwich.edu.vn",
-            "teacher": "teacher.greenwich.edu.vn",
-            "admin": "admin.greenwich.edu.vn",
-            "staff": "staff.greenwich.edu.vn"
-        }
-        
-        domain = domain_map.get(role, "greenwich.edu.vn")
-        return f"{username.lower()}@{domain}"
+        # All users use the same domain now
+        return f"{username.lower()}@fpt.edu.vn"

@@ -1,9 +1,9 @@
 """
 Authentication schemas
 """
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, field_serializer
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 
 
 class StudentLoginRequest(BaseModel):
@@ -15,7 +15,7 @@ class StudentLoginRequest(BaseModel):
     @classmethod
     def validate_student_id(cls, v: str) -> str:
         """Validate student ID format"""
-        v = v.strip().upper()
+        v = v.strip()
         # Basic validation - more specific validation in service layer
         if not v:
             raise ValueError("Student ID cannot be empty")
@@ -87,7 +87,7 @@ class UserProfileResponse(BaseModel):
     # Profile
     phone_number: Optional[str] = None
     avatar_url: Optional[str] = None
-    date_of_birth: Optional[str] = None
+    date_of_birth: Optional[date] = None
     gender: Optional[str] = None
     
     # Academic Context
@@ -107,7 +107,13 @@ class UserProfileResponse(BaseModel):
     last_login: Optional[datetime] = None
     created_at: datetime
     
+    @field_serializer('date_of_birth')
+    def serialize_date_of_birth(self, value: Optional[date]) -> Optional[str]:
+        """Serialize date_of_birth to ISO format string"""
+        return value.isoformat() if value else None
+    
     model_config = {
+        "from_attributes": True,
         "json_schema_extra": {
             "example": {
                 "id": 1,
@@ -149,3 +155,18 @@ class ChangePasswordRequest(BaseModel):
             raise ValueError("Password must contain uppercase, lowercase, and digits")
         
         return v
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request"""
+    email: EmailStr = Field(..., description="User's email address")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "email": "admin@fe.edu.vn"
+            }
+        }
+    }
+
+

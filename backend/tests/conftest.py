@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures."""
+﻿"""Pytest configuration and fixtures."""
 import asyncio
 import os
 from typing import AsyncGenerator, Generator
@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import sessionmaker, Session
@@ -15,19 +15,27 @@ from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.core.database import Base, get_db
 from app.core.settings import settings
+from app.core.firebase import initialize_firebase
 from app.models import (
     User, Campus, Major, Course, Semester, 
-    Section, Enrollment, Grade, Invoice, Payment,
+    CourseSection, Enrollment, Grade, Invoice, Payment,
     Document, SupportTicket, TicketEvent
 )
 
-# Test database URL (SQLite for testing)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Initialize Firebase for tests - uses real credentials
+print(" Initializing Firebase for tests...")
+firebase_initialized = initialize_firebase()
+if firebase_initialized:
+    print(" Firebase initialized successfully for tests!")
+else:
+    print("  Firebase initialization failed - some tests will be skipped")
+
+# Test database URL (PostgreSQL for testing - unified with production)
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/greenwich_test"
 
 # Create async engine for tests
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
 
@@ -63,16 +71,19 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture(scope="function")
-def client(db_session: AsyncSession) -> Generator:
-    """Create a test client with database override."""
+@pytest_asyncio.fixture
+async def client(db_session: AsyncSession) -> AsyncGenerator:
+    """Create an async test client with database override."""
     
     async def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     
-    with TestClient(app) as test_client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver"
+    ) as test_client:
         yield test_client
     
     app.dependency_overrides.clear()
@@ -101,9 +112,7 @@ async def test_major(db_session: AsyncSession) -> Major:
         name="Computer Science",
         code="CS",
         description="Computer Science Program",
-        degree_type="bachelor",
-        duration_years=4,
-        total_credits=120
+        is_active=True
     )
     db_session.add(major)
     await db_session.commit()
@@ -114,19 +123,19 @@ async def test_major(db_session: AsyncSession) -> Major:
 @pytest_asyncio.fixture
 async def test_student(db_session: AsyncSession, test_campus: Campus, test_major: Major) -> User:
     """Create a test student user."""
-    from app.services.auth_service import hash_password
+    from app.core.security import SecurityUtils
     
     student = User(
-        username="HieuNDGCD220033",
-        email="hieu@student.greenwich.edu.vn",
-        password=hash_password("password123"),
-        full_name="Nguyen Dinh Hieu",
+        username="GHPSTD240001",
+        email="student@greenwich.edu.vn",
+        password_hash=SecurityUtils.hash_password("password123"),
+        full_name="Test Student",
         role="student",
         campus_id=test_campus.id,
         major_id=test_major.id,
-        year=2022,
-        is_active=True,
-        firebase_uid="test_firebase_uid_student"
+        year_entered=2024,
+        status="active",
+        firebase_uid="student123"  # Match token uid
     )
     db_session.add(student)
     await db_session.commit()
@@ -135,19 +144,42 @@ async def test_student(db_session: AsyncSession, test_campus: Campus, test_major
 
 
 @pytest_asyncio.fixture
+async def test_student2(db_session: AsyncSession, test_campus: Campus, test_major: Major) -> User:
+    """Create a second test student user."""
+    from app.core.security import SecurityUtils
+    
+    student2 = User(
+        username="GHPSTD240002",
+        email="student2@greenwich.edu.vn",
+        password_hash=SecurityUtils.hash_password("password123"),
+        full_name="Test Student 2",
+        role="student",
+        campus_id=test_campus.id,
+        major_id=test_major.id,
+        year_entered=2024,
+        status="active",
+        firebase_uid="student456"  # Different uid
+    )
+    db_session.add(student2)
+    await db_session.commit()
+    await db_session.refresh(student2)
+    return student2
+
+
+@pytest_asyncio.fixture
 async def test_teacher(db_session: AsyncSession, test_campus: Campus) -> User:
     """Create a test teacher user."""
-    from app.services.auth_service import hash_password
+    from app.core.security import SecurityUtils
     
     teacher = User(
-        username="JohnDGCD200001",
-        email="john@greenwich.edu.vn",
-        password=hash_password("password123"),
+        username="TeacherGCD200001",
+        email="teacher@greenwich.edu.vn",
+        password_hash=SecurityUtils.hash_password("password123"),
         full_name="John Doe",
         role="teacher",
         campus_id=test_campus.id,
-        is_active=True,
-        firebase_uid="test_firebase_uid_teacher"
+        status="active",
+        firebase_uid="teacher123"  # Match token uid
     )
     db_session.add(teacher)
     await db_session.commit()
@@ -156,19 +188,19 @@ async def test_teacher(db_session: AsyncSession, test_campus: Campus) -> User:
 
 
 @pytest_asyncio.fixture
-async def test_admin(db_session: AsyncSession, test_campus: Campus) -> User:
-    """Create a test admin user."""
-    from app.services.auth_service import hash_password
+async def test_admin(db_session: AsyncSession, test_campus: Campus, test_student: User, test_teacher: User) -> User:
+    """Create a test admin user (depends on student and teacher to ensure ID=3)."""
+    from app.core.security import SecurityUtils
     
     admin = User(
         username="AdminGCD200001",
         email="admin@greenwich.edu.vn",
-        password=hash_password("password123"),
+        password_hash=SecurityUtils.hash_password("password123"),
         full_name="Admin User",
-        role="admin",
+        role="super_admin",  # Changed from "admin" to match academic router requirements
         campus_id=test_campus.id,
-        is_active=True,
-        firebase_uid="test_firebase_uid_admin"
+        status="active",
+        firebase_uid="admin123"  # Match admin_token
     )
     db_session.add(admin)
     await db_session.commit()
@@ -196,7 +228,7 @@ async def test_semester(db_session: AsyncSession) -> Semester:
 async def test_course(db_session: AsyncSession, test_major: Major) -> Course:
     """Create a test course."""
     course = Course(
-        code="CS101",
+        course_code="COMP1010",  # Fixed: Changed from CS101 to match pattern ^[A-Z]{3,4}\d{4}$
         name="Introduction to Programming",
         credits=3,
         major_id=test_major.id,
@@ -215,16 +247,16 @@ async def test_section(
     test_semester: Semester,
     test_teacher: User,
     test_campus: Campus
-) -> Section:
+) -> CourseSection:
     """Create a test course section."""
-    section = Section(
+    section = CourseSection(
         course_id=test_course.id,
         semester_id=test_semester.id,
-        teacher_id=test_teacher.id,
-        campus_id=test_campus.id,
-        section_number="A1",
-        max_capacity=30,
-        current_enrollment=0
+        instructor_id=test_teacher.id,  # Fixed: teacher_id  instructor_id
+        section_code="A1",  # Fixed: section_number  section_code
+        max_students=30,  # Fixed: max_capacity  max_students
+        enrolled_count=0  # Fixed: current_enrollment  enrolled_count
+        # Note: campus_id doesn't exist in CourseSection model
     )
     db_session.add(section)
     await db_session.commit()
@@ -236,19 +268,19 @@ async def test_section(
 async def test_enrollment(
     db_session: AsyncSession,
     test_student: User,
-    test_section: Section
+    test_section: CourseSection
 ) -> Enrollment:
     """Create a test enrollment."""
     enrollment = Enrollment(
         student_id=test_student.id,
-        section_id=test_section.id,
-        status="enrolled",
-        enrolled_at=datetime.utcnow()
+        course_section_id=test_section.id,  # Fixed: section_id  course_section_id
+        status="enrolled"
+        # Note: enrollment_date has server default, no need to set
     )
     db_session.add(enrollment)
     
     # Update section enrollment count
-    test_section.current_enrollment += 1
+    test_section.enrolled_count += 1  # Fixed: current_enrollment  enrolled_count
     
     await db_session.commit()
     await db_session.refresh(enrollment)
@@ -332,39 +364,95 @@ class MockFirebaseUser:
         self.custom_claims = {"role": role}
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)  # Auto-apply to all tests
 def mock_firebase_auth(monkeypatch):
-    """Mock Firebase authentication."""
-    def mock_verify_token(id_token: str):
-        # Parse mock token format: "mock_token_{uid}_{role}"
-        parts = id_token.split("_")
-        if len(parts) >= 3:
-            uid = parts[2]
-            role = parts[3] if len(parts) > 3 else "student"
-            return {"uid": uid, "role": role}
+    """Mock Firebase authentication and user creation."""
+    def mock_verify_token(id_token: str, check_revoked: bool = False):
+        # Parse mock token format: "Bearer_{uid}_{role}"
+        # Use a format that's easy to parse even with underscores in role names
+        if not id_token.startswith("Bearer_"):
+            raise ValueError("Invalid token format")
+        
+        # Remove "Bearer_" prefix and split by underscore
+        token_parts = id_token[7:].split("_", 1)  # Split into uid and role (max 2 parts)
+        
+        if len(token_parts) == 2:
+            uid, role = token_parts
+            
+            # Mock database user ID based on role (matches test fixtures)
+            # Student has ID 1, Teacher has ID 2, Admin has ID 3
+            user_id_map = {
+                "student123": 1,
+                "teacher123": 2,
+                "admin123": 3
+            }
+            db_user_id = user_id_map.get(uid, 1)
+            
+            # Return structure matching Firebase decoded token
+            return {
+                "uid": uid,
+                "id": db_user_id,  # Database user ID 
+                "db_user_id": db_user_id,  # For backward compatibility with other routers
+                "role": role,  # Single role for require_roles check
+                "roles": [role],  # Custom claim - roles as list for RBAC system
+                "email": f"{uid}@greenwich.edu.vn"
+            }
         raise ValueError("Invalid token")
     
     def mock_create_custom_token(uid: str, claims: dict = None):
         return f"custom_token_{uid}".encode()
     
+    def mock_create_user(email: str, password: str, **kwargs):
+        """Mock Firebase user creation - returns fake user record."""
+        import uuid
+        return type('UserRecord', (), {
+            'uid': f'firebase_{uuid.uuid4().hex[:12]}',
+            'email': email
+        })()
+    
+    def mock_set_custom_user_claims(uid: str, custom_claims: dict):
+        """Mock setting custom claims - does nothing in tests."""
+        pass
+    
     # Mock Firebase Admin SDK functions
     monkeypatch.setattr("firebase_admin.auth.verify_id_token", mock_verify_token)
     monkeypatch.setattr("firebase_admin.auth.create_custom_token", mock_create_custom_token)
+    monkeypatch.setattr("firebase_admin.auth.create_user", mock_create_user)
+    monkeypatch.setattr("firebase_admin.auth.set_custom_user_claims", mock_set_custom_user_claims)
 
 
 @pytest.fixture
 def student_token() -> str:
     """Generate a mock student authentication token."""
-    return "mock_token_test_firebase_uid_student_student"
+    return "Bearer_student123_student"
 
 
 @pytest.fixture
 def teacher_token() -> str:
     """Generate a mock teacher authentication token."""
-    return "mock_token_test_firebase_uid_teacher_teacher"
+    return "Bearer_teacher123_teacher"
 
 
 @pytest.fixture
 def admin_token() -> str:
     """Generate a mock admin authentication token."""
-    return "mock_token_test_firebase_uid_admin_admin"
+    return "Bearer_admin123_super_admin"
+
+
+@pytest.fixture
+def student_token_headers(student_token: str) -> dict:
+    """Generate HTTP headers with student authentication token."""
+    return {"Authorization": f"Bearer {student_token}"}
+
+
+@pytest.fixture
+def teacher_token_headers(teacher_token: str) -> dict:
+    """Generate HTTP headers with teacher authentication token."""
+    return {"Authorization": f"Bearer {teacher_token}"}
+
+
+@pytest.fixture
+def admin_token_headers(admin_token: str) -> dict:
+    """Generate HTTP headers with admin authentication token."""
+    return {"Authorization": f"Bearer {admin_token}"}
+

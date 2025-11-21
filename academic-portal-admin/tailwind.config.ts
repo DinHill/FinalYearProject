@@ -11,8 +11,88 @@ export default {
     extend: {
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
+        body: ["var(--font-roboto)", "Roboto", "Helvetica", "Arial", "sans-serif"],
+        accent: ["Merriweather", "Georgia", "serif"],
+      },
+      fontSize: {
+        // Academic Typography Scale
+        'h1': ['32px', { lineHeight: '1.2', fontWeight: '700' }],  // Page titles
+        'h2': ['24px', { lineHeight: '1.3', fontWeight: '600' }],  // Section titles
+        'h3': ['20px', { lineHeight: '1.4', fontWeight: '500' }],  // Subheaders
+        'body': ['16px', { lineHeight: '1.6', fontWeight: '400' }],  // Body text
+        'caption': ['14px', { lineHeight: '1.5', fontWeight: '500' }],  // Labels, table headers
+        'button': ['15px', { lineHeight: '1.4', fontWeight: '600' }],  // Buttons
       },
       colors: {
+        // Full Greenwich/FPT Academic Color System
+        brand: {
+          // Primary Brand - Deep Navy
+          navy: {
+            DEFAULT: "#00205B",  // Main header, sidebar, buttons
+            hover: "#10357B",     // Hover/active states
+          },
+          // Secondary Accent - Bright Blue
+          blue: {
+            DEFAULT: "#007AC3",   // Links, highlight icons, section headers
+            50: "#E6F4FB",
+            100: "#CCE9F7",
+            200: "#99D3EF",
+            300: "#66BDE7",
+            400: "#33A7DF",
+            500: "#007AC3",
+            600: "#00629C",
+            700: "#004975",
+            800: "#00314E",
+            900: "#001827",
+          },
+          // Highlight / CTA - Orange
+          orange: {
+            DEFAULT: "#F36C21",   // Submit, Pay, Apply, Start buttons
+            50: "#FEF3ED",
+            100: "#FDE7DB",
+            500: "#F36C21",
+            600: "#D85A15",
+            700: "#B34A12",
+          },
+          // Success - Green
+          green: {
+            DEFAULT: "#6CC24A",   // Status badges, completion indicators
+            50: "#F0F9EC",
+            100: "#E1F3D9",
+            500: "#6CC24A",
+            600: "#56A038",
+            700: "#417D2A",
+          },
+          // Warning - Amber
+          amber: {
+            DEFAULT: "#FFC300",   // Warnings, low balance alerts
+            50: "#FFF9E6",
+            100: "#FFF3CC",
+            500: "#FFC300",
+            600: "#D9A500",
+            700: "#B38800",
+          },
+          // Error - Red
+          red: {
+            DEFAULT: "#E53935",   // Validation, form errors
+            50: "#FFEBEE",
+            100: "#FFCDD2",
+            500: "#E53935",
+            600: "#D32F2F",
+            700: "#C62828",
+          },
+          // Text Colors
+          text: {
+            dark: "#212121",      // Primary text (titles, body)
+            light: "#4A4A4A",     // Secondary text, descriptions
+          },
+          // UI Colors
+          border: "#D0D3D9",      // Table/grid borders
+          card: "#FFFFFF",        // Cards, modals, input fields
+          background: "#F5F7FA",  // Web/app background
+        },
+        
+        // System colors (compatible with existing components)
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -24,60 +104,70 @@ export default {
           foreground: "hsl(var(--popover-foreground))",
         },
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-          50: "#eff6ff",
-          100: "#dbeafe",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
+          DEFAULT: "#007AC3",     // Brand blue
+          foreground: "#FFFFFF",
+          hover: "#10357B",       // Navy hover
+          50: "#E6F4FB",
+          100: "#CCE9F7",
+          200: "#99D3EF",
+          300: "#66BDE7",
+          400: "#33A7DF",
+          500: "#007AC3",
+          600: "#00629C",
+          700: "#004975",
+          800: "#00314E",
+          900: "#001827",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#00205B",     // Brand navy
+          foreground: "#FFFFFF",
+          hover: "#10357B",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#007AC3",     // Brand blue
+          foreground: "#FFFFFF",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "#E53935",     // Brand red
+          foreground: "#FFFFFF",
         },
-        border: "hsl(var(--border))",
+        border: "#D0D3D9",        // Brand border gray
         input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
+        ring: "#007AC3",          // Brand blue
         chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
+          "1": "#007AC3",         // Brand blue
+          "2": "#6CC24A",         // Brand green
+          "3": "#F36C21",         // Brand orange
+          "4": "#00205B",         // Brand navy
+          "5": "#FFC300",         // Brand amber
         },
         success: {
-          50: "#f0fdf4",
-          100: "#dcfce7",
-          500: "#22c55e",
-          600: "#16a34a",
-          700: "#15803d",
+          DEFAULT: "#6CC24A",     // Brand green
+          50: "#F0F9EC",
+          100: "#E1F3D9",
+          500: "#6CC24A",
+          600: "#56A038",
+          700: "#417D2A",
         },
         warning: {
-          50: "#fffbeb",
-          100: "#fef3c7",
-          500: "#f59e0b",
-          600: "#d97706",
-          700: "#b45309",
+          DEFAULT: "#FFC300",     // Brand amber
+          50: "#FFF9E6",
+          100: "#FFF3CC",
+          500: "#FFC300",
+          600: "#D9A500",
+          700: "#B38800",
         },
         error: {
-          50: "#fef2f2",
-          100: "#fee2e2",
-          500: "#ef4444",
-          600: "#dc2626",
-          700: "#b91c1c",
+          DEFAULT: "#E53935",     // Brand red
+          50: "#FFEBEE",
+          100: "#FFCDD2",
+          500: "#E53935",
+          600: "#D32F2F",
+          700: "#C62828",
         },
       },
       borderRadius: {

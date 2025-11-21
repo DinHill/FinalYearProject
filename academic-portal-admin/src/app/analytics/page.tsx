@@ -1,144 +1,142 @@
+'use client';
+
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   BarChart3,
   TrendingUp,
-  TrendingDown,
   Users,
-  BookOpen,
+  GraduationCap,
   DollarSign,
   Download,
-  Calendar,
   Filter,
   RefreshCw,
   Eye,
-  Clock,
-  Target
+  Clock
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  Legend
+} from 'recharts';
+import { toast } from 'sonner';
 
 export default function AnalyticsPage() {
-  const analyticsData = [
-    {
-      title: 'Student Enrollment',
-      value: '2,847',
-      change: '+12.5%',
-      trend: 'up',
-      icon: Users,
-      color: 'text-blue-600',
-      description: 'Total enrolled students this semester'
-    },
-    {
-      title: 'Course Completion Rate',
-      value: '94.2%',
-      change: '+2.1%',
-      trend: 'up',
-      icon: Target,
-      color: 'text-green-600',
-      description: 'Students completing their courses'
-    },
-    {
-      title: 'Revenue This Month',
-      value: '$125,450',
-      change: '+8.3%',
-      trend: 'up',
-      icon: DollarSign,
-      color: 'text-yellow-600',
-      description: 'Total revenue from fees and payments'
-    },
-    {
-      title: 'Portal Usage',
-      value: '89.7%',
-      change: '-1.2%',
-      trend: 'down',
-      icon: Eye,
-      color: 'text-purple-600',
-      description: 'Daily active users on portal'
+  const [selectedCampus, setSelectedCampus] = useState('all');
+  const [selectedTerm, setSelectedTerm] = useState('fall-2024');
+  const [dateRange, setDateRange] = useState('6-months');
+
+  const handleRefresh = () => {
+    toast.info('Refreshing analytics data...');
+    window.location.reload();
+  };
+
+  const handleExportReport = async () => {
+    try {
+      toast.info('Generating report...');
+      const response = await api.get('/api/v1/dashboard/analytics/export', { 
+        params: { campus: selectedCampus, term: selectedTerm, range: dateRange }
+      });
+      
+      if (response.success && response.data) {
+        // Create CSV blob and download
+        const blob = new Blob([JSON.stringify(response.data)], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `analytics_export_${new Date().toISOString()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast.success('Report exported successfully');
+      }
+    } catch {
+      toast.error('Failed to export report');
     }
+  };
+
+  // Fetch real data from backend
+  const { data: userActivityResponse } = useQuery({
+    queryKey: ['analytics', 'user-activity', selectedCampus, selectedTerm, dateRange],
+    queryFn: async () => {
+      const result = await api.get('/api/v1/dashboard/analytics/user-activity', {
+        params: { campus: selectedCampus !== 'all' ? selectedCampus : undefined }
+      });
+      return result;
+    },
+  });
+
+  const { data: enrollmentResponse } = useQuery({
+    queryKey: ['analytics', 'enrollment-trends', selectedCampus, selectedTerm],
+    queryFn: async () => {
+      const result = await api.get('/api/v1/dashboard/analytics/enrollment-trends', {
+        params: { campus: selectedCampus !== 'all' ? selectedCampus : undefined }
+      });
+      return result;
+    },
+  });
+
+  const { data: revenueResponse } = useQuery({
+    queryKey: ['analytics', 'revenue', selectedCampus, selectedTerm, dateRange],
+    queryFn: async () => {
+      const result = await api.get('/api/v1/dashboard/analytics/revenue', {
+        params: { campus: selectedCampus !== 'all' ? selectedCampus : undefined }
+      });
+      return result;
+    },
+  });
+
+  // Use real data or fallback to empty arrays
+  const userActivityData = Array.isArray(userActivityResponse?.data) ? userActivityResponse.data : [];
+  const enrollmentData = Array.isArray(enrollmentResponse?.data) ? enrollmentResponse.data : [];
+  const revenueData = Array.isArray(revenueResponse?.data) ? revenueResponse.data : [];
+
+  const attendanceData = [
+    { name: 'Excellent (90-100%)', value: 45, color: '#10B981' },
+    { name: 'Good (80-89%)', value: 35, color: '#3B82F6' },
+    { name: 'Average (70-79%)', value: 15, color: '#F59E0B' },
+    { name: 'Poor (<70%)', value: 5, color: '#EF4444' }
   ];
 
-  const topCourses = [
-    {
-      name: 'Introduction to Computer Science',
-      code: 'CS101',
-      enrollment: 156,
-      completion: 98,
-      satisfaction: 4.8
-    },
-    {
-      name: 'Business Administration',
-      code: 'BA201',
-      enrollment: 134,
-      completion: 89,
-      satisfaction: 4.6
-    },
-    {
-      name: 'Digital Marketing',
-      code: 'MKT301',
-      enrollment: 98,
-      completion: 92,
-      satisfaction: 4.7
-    },
-    {
-      name: 'Data Analytics',
-      code: 'DA401',
-      enrollment: 87,
-      completion: 95,
-      satisfaction: 4.9
-    }
-  ];
-
-  const monthlyData = [
-    { month: 'Jan', students: 2400, revenue: 115000, courses: 45 },
-    { month: 'Feb', students: 2600, revenue: 125000, courses: 48 },
-    { month: 'Mar', students: 2800, revenue: 135000, courses: 52 },
-    { month: 'Apr', students: 2750, revenue: 128000, courses: 50 },
-    { month: 'May', students: 2900, revenue: 142000, courses: 55 },
-    { month: 'Jun', students: 2847, revenue: 125450, courses: 54 }
-  ];
-
-  const recentActivities = [
-    {
-      activity: 'New student registration spike',
-      time: '2 hours ago',
-      impact: '+15% compared to last week',
-      type: 'positive'
-    },
-    {
-      activity: 'Course completion rate improved',
-      time: '1 day ago',
-      impact: '+2.1% month over month',
-      type: 'positive'
-    },
-    {
-      activity: 'Payment processing delay',
-      time: '3 days ago',
-      impact: 'Affected 23 transactions',
-      type: 'negative'
-    },
-    {
-      activity: 'New feature usage increase',
-      time: '1 week ago',
-      impact: '+45% feature adoption',
-      type: 'positive'
-    }
+  const documentSLAData = [
+    { type: 'Official Transcript', processed: 45, onTime: 42, breached: 3 },
+    { type: 'Enrollment Certificate', processed: 23, onTime: 21, breached: 2 },
+    { type: 'Grade Report', processed: 67, onTime: 65, breached: 2 },
+    { type: 'Degree Certificate', processed: 34, onTime: 33, breached: 1 }
   ];
 
   return (
     <AdminLayout>
-      <PageHeader 
+      <PageHeader
+        breadcrumbs={[{ label: 'Analytics & Reports' }]}
+        subtitle="Track performance metrics and generate insights"
         actions={
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
-            </Button>
-            <Button>
+            <Button size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white" onClick={handleExportReport}>
               <Download className="w-4 h-4 mr-2" />
               Export Report
             </Button>
@@ -146,184 +144,327 @@ export default function AnalyticsPage() {
         }
       />
 
-      <div className="space-y-6">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {analyticsData.map((metric, index) => {
-            const Icon = metric.icon;
-            const TrendIcon = metric.trend === 'up' ? TrendingUp : TrendingDown;
-            const trendColor = metric.trend === 'up' ? 'text-green-600' : 'text-red-600';
-            
-            return (
-              <Card key={index}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`p-3 rounded-full bg-muted ${metric.color}`}>
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <div className={`flex items-center gap-1 ${trendColor}`}>
-                      <TrendIcon className="w-4 h-4" />
-                      <span className="text-sm font-medium">{metric.change}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">{metric.title}</h3>
-                    <p className="text-2xl font-bold text-foreground mt-1">{metric.value}</p>
-                    <p className="text-xs text-muted-foreground mt-2">{metric.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+      <div className="p-6 space-y-6">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-card rounded-lg border">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
+          
+          <Select value={selectedCampus} onValueChange={setSelectedCampus}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Campus" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Campuses</SelectItem>
+              <SelectItem value="main">Main Campus</SelectItem>
+              <SelectItem value="north">North Campus</SelectItem>
+              <SelectItem value="south">South Campus</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Term" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fall-2024">Fall 2024</SelectItem>
+              <SelectItem value="spring-2024">Spring 2024</SelectItem>
+              <SelectItem value="summer-2024">Summer 2024</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Date Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1-month">Last Month</SelectItem>
+              <SelectItem value="3-months">Last 3 Months</SelectItem>
+              <SelectItem value="6-months">Last 6 Months</SelectItem>
+              <SelectItem value="1-year">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Charts and Analytics */}
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Users Today</p>
+                  <p className="text-xl font-semibold">1,847</p>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
+                    <span className="text-sm text-green-600">+12% from yesterday</span>
+                  </div>
+                </div>
+                <Users className="w-8 h-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Open Document Requests</p>
+                  <p className="text-xl font-semibold">23</p>
+                  <div className="flex items-center mt-2">
+                    <Clock className="w-4 h-4 text-orange-600 mr-1" />
+                    <span className="text-sm text-orange-600">3 near SLA breach</span>
+                  </div>
+                </div>
+                <Clock className="w-8 h-8 text-orange-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Unpaid Invoices</p>
+                  <p className="text-xl font-semibold font-mono">₫89.4M</p>
+                  <div className="flex items-center mt-2">
+                    <Badge variant="destructive" className="text-xs">
+                      34 overdue
+                    </Badge>
+                  </div>
+                </div>
+                <DollarSign className="w-8 h-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">News Reach</p>
+                  <p className="text-xl font-semibold">2,341</p>
+                  <div className="flex items-center mt-2">
+                    <Eye className="w-4 h-4 text-blue-600 mr-1" />
+                    <span className="text-sm text-blue-600">82% open rate</span>
+                  </div>
+                </div>
+                <Eye className="w-8 h-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Monthly Trends */}
+          {/* User Activity Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                User Activity Trends
+              </CardTitle>
+              <CardDescription>Active users by role over the last 6 months</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={userActivityData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="students" 
+                    stroke="#3B82F6" 
+                    strokeWidth={2}
+                    name="Students"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="teachers" 
+                    stroke="#10B981" 
+                    strokeWidth={2}
+                    name="Teachers"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="admins" 
+                    stroke="#F59E0B" 
+                    strokeWidth={2}
+                    name="Admins"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Enrollment by Program */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5" />
+                Enrollment by Program
+              </CardTitle>
+              <CardDescription>Current enrollment vs capacity</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={enrollmentData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="program" stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="enrolled" fill="#3B82F6" name="Enrolled" />
+                  <Bar dataKey="capacity" fill="#E5E7EB" name="Capacity" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Revenue Trends */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Revenue Trends
+              </CardTitle>
+              <CardDescription>Revenue breakdown by source (₫1000s)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <Tooltip 
+                    formatter={(value: number) => [`₫${value.toLocaleString()}`, '']}
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Area 
+                    type="monotone" 
+                    dataKey="tuition" 
+                    stackId="1" 
+                    stroke="#3B82F6" 
+                    fill="#3B82F6"
+                    name="Tuition"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="fees" 
+                    stackId="1" 
+                    stroke="#10B981" 
+                    fill="#10B981"
+                    name="Fees"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="documents" 
+                    stackId="1" 
+                    stroke="#F59E0B" 
+                    fill="#F59E0B"
+                    name="Documents"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Attendance Distribution */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5" />
-                Monthly Trends
+                Attendance Distribution
               </CardTitle>
-              <CardDescription>Student enrollment and revenue over time</CardDescription>
+              <CardDescription>Student attendance rates this semester</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {monthlyData.map((data, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <span className="font-medium text-foreground">{data.month}</span>
-                    </div>
-                    <div className="flex gap-6 text-sm">
-                      <div className="text-center">
-                        <p className="text-muted-foreground">Students</p>
-                        <p className="font-medium">{data.students.toLocaleString()}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-muted-foreground">Revenue</p>
-                        <p className="font-medium">${(data.revenue / 1000).toFixed(0)}k</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-muted-foreground">Courses</p>
-                        <p className="font-medium">{data.courses}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top Performing Courses */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                Top Performing Courses
-              </CardTitle>
-              <CardDescription>Courses with highest enrollment and satisfaction</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {topCourses.map((course, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-foreground">{course.name}</h4>
-                      <p className="text-sm text-muted-foreground">{course.code}</p>
-                    </div>
-                    <div className="flex gap-4 text-sm">
-                      <div className="text-center">
-                        <p className="text-muted-foreground">Enrolled</p>
-                        <p className="font-medium">{course.enrollment}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-muted-foreground">Completed</p>
-                        <p className="font-medium">{course.completion}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-muted-foreground">Rating</p>
-                        <p className="font-medium">{course.satisfaction}⭐</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={attendanceData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label
+                  >
+                    {attendanceData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Analytics Insights */}
+        {/* Document SLA Performance */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Recent Insights
+              <Clock className="w-5 h-5" />
+              Document Processing SLA Performance
             </CardTitle>
-            <CardDescription>Notable trends and events affecting your metrics</CardDescription>
+            <CardDescription>Service level agreement compliance for document requests</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start gap-4 p-3 border rounded-lg">
-                  <div className={`mt-1 w-2 h-2 rounded-full ${
-                    activity.type === 'positive' ? 'bg-green-600' : 'bg-red-600'
-                  }`} />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-foreground">{activity.activity}</h4>
-                    <p className="text-sm text-muted-foreground">{activity.impact}</p>
+              {documentSLAData.map((item) => (
+                <div key={item.type} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="font-medium">{item.type}</p>
+                      <p className="text-sm text-muted-foreground">{item.processed} processed this month</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    {activity.time}
+                  <div className="flex items-center gap-6">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">On Time</p>
+                      <p className="font-semibold text-green-600">{item.onTime}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">Breached</p>
+                      <p className="font-semibold text-red-600">{item.breached}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">SLA Rate</p>
+                      <Badge 
+                        variant={item.breached === 0 ? 'default' : item.breached <= 2 ? 'secondary' : 'destructive'}
+                      >
+                        {Math.round((item.onTime / item.processed) * 100)}%
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-
-        {/* Analytics Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Custom Reports
-              </CardTitle>
-              <CardDescription>Create detailed analytics reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full">Create Report</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Scheduled Reports
-              </CardTitle>
-              <CardDescription>Automate report generation</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full">Schedule Reports</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5" />
-                Goal Tracking
-              </CardTitle>
-              <CardDescription>Set and monitor performance goals</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full">Manage Goals</Button>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </AdminLayout>
   );

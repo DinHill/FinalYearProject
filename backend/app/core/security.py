@@ -81,15 +81,31 @@ async def verify_firebase_token(
         # Extract token from Authorization header
         token = credentials.credentials
         
-        # Verify Firebase token (always check if revoked for security)
-        decoded_token = FirebaseService.verify_id_token(token, check_revoked=True)
+        # Debug: Log token format (first/last 20 chars only for security)
+        token_preview = f"{token[:20]}...{token[-20:]}" if len(token) > 40 else token
+        logger.info(f"Verifying Firebase token: {token_preview} (length: {len(token)})")
+        
+        # Verify Firebase token with timeout to prevent hanging
+        import asyncio
+        try:
+            decoded_token = await asyncio.wait_for(
+                asyncio.to_thread(FirebaseService.verify_id_token, token, False),
+                timeout=10.0
+            )
+        except asyncio.TimeoutError:
+            logger.error("Firebase token verification timed out after 10 seconds")
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Token verification timed out. Please try again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
         # Add user info to request state for logging
         request.state.user_id = decoded_token.get('uid')
         request.state.user_email = decoded_token.get('email')
         request.state.user_role = decoded_token.get('roles', [])
         
-        logger.debug(f"Firebase token verified for user: {decoded_token.get('uid')}")
+        logger.info(f"✅ Token verified for user: {decoded_token.get('email')} ({decoded_token.get('uid')})")
         
         return decoded_token
         

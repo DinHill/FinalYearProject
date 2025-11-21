@@ -18,14 +18,15 @@ class Role(BaseModel):
     - student: Standard student permissions (campus-scoped)
     - teacher: Standard teacher permissions (campus-scoped)
     - super_admin: Full system access (typically campus_id=NULL for cross-campus access)
-    - academic_admin: Manage courses, schedules, enrollments, grades (can be campus-scoped)
-    - finance_admin: Manage invoices, payments, fees (can be campus-scoped)
-    - support_admin: Manage support tickets, document requests (can be campus-scoped)
-    - content_admin: Manage announcements, notifications (can be campus-scoped)
+    - academic_admin: Academic Affairs Office - Manage courses, schedules, enrollments, grades (can be campus-scoped)
+    - finance_admin: Finance Office - Manage invoices, payments, fees (can be campus-scoped)
+    - support_admin: Student Affairs Office (Công Tác Sinh Viên) - Manage support tickets, student events, 
+                     clubs, announcements, student welfare (can be campus-scoped)
     """
     __tablename__ = "roles"
     
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True, comment="Business key for stable identification (STU, TCH, ADM, etc.)")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     # Relationships

@@ -3,7 +3,7 @@
 FastAPI-based REST API for Greenwich University Vietnam Academic Management System.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green.svg)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com/)
 [![Tests](https://img.shields.io/badge/tests-114%20passing-success.svg)](./tests/)
 [![Coverage](https://img.shields.io/badge/coverage-80%25+-success.svg)](./tests/)
 [![Status](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)]()
@@ -18,57 +18,413 @@ FastAPI-based REST API for Greenwich University Vietnam Academic Management Syst
 ✅ Production Ready: Yes
 ```
 
-## 🚀 Quick Links
+---
 
-- **📖 [API Documentation](./API_REFERENCE.md)** - Complete API reference with examples
-- **🏗️ [Architecture](./docs/ARCHITECTURE.md)** - System architecture & design
-- **🚢 [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Step-by-step deployment
-- **⚡ [Quick Deploy](./docs/QUICK_DEPLOY.md)** - Fast deployment checklist
-- **⚡ [Quick Start](./docs/QUICKSTART.md)** - Get started quickly
-- **🧪 [Testing Guide](./docs/TESTING_GUIDE.md)** - How to run tests
-- **� [Firebase Setup](./docs/FIREBASE_MIGRATION_GUIDE.md)** - Firebase configuration
-- **☁️ [GCS Setup](./docs/GCS_SETUP_GUIDE.md)** - Google Cloud Storage setup
+## 📋 Table of Contents
 
-## ✨ Features
+- [Technology Stack](#-technology-stack)
+- [Database Schema](#-database-schema-28-tables)
+- [Authentication](#-authentication-flow)
+- [API Endpoints](#-api-endpoints-60-total)
+- [Key Features](#-key-features)
+- [Backend Services](#-backend-services)
+- [Quick Start](#-quick-start-development)
+- [Testing](#-testing)
+- [Deployment](#-deployment)
+- [Documentation](#-documentation)
 
-### Core Modules (6/6 Complete)
-
-- ✅ **Authentication** (5 endpoints) - Firebase integration, role-based access
-- ✅ **User Management** (7 endpoints) - Auto-generated Greenwich usernames
-- ✅ **Academic** (15+ endpoints) - Enrollment, grades, GPA calculation
-- ✅ **Finance** (10+ endpoints) - Invoices, payments with idempotency
-- ✅ **Documents** (12+ endpoints) - File storage with presigned URLs
-- ✅ **Support** (10+ endpoints) - Ticketing system with SLA tracking
-
-### Key Features
-
-- 🔐 Firebase authentication (custom tokens + session cookies)
-- 📝 Auto-generated Vietnamese usernames (Nguyen Dinh Hieu → HieuNDGCD220033)
-- 📊 Weighted GPA calculation with academic standing
-- ✅ Enrollment validation (capacity, conflicts, prerequisites)
-- 💳 Idempotent payment processing (prevent duplicates)
-- 📁 Presigned URLs for scalable file storage
-- 🎫 Support tickets with SLA tracking
-- 📄 PDF generation (transcripts, certificates, invoices)
+---
 
 ## 🏗️ Technology Stack
 
-- **Framework**: FastAPI 0.109 (async Python)
-- **Database**: PostgreSQL 15+ with SQLAlchemy 2.0 async ORM
-- **Authentication**: Firebase Admin SDK
-- **File Storage**: Google Cloud Storage with presigned URLs
-- **Caching**: Redis 7+
-- **PDF Generation**: ReportLab
-- **Testing**: Pytest with 80%+ coverage
-- **Background Tasks**: Dramatiq
+```
+• Framework: FastAPI 0.115 (async Python)
+• Database: PostgreSQL 15+ with SQLAlchemy 2.0 (async ORM)
+• Authentication: Firebase Admin SDK (custom tokens + ID tokens)
+• File Storage: Google Cloud Storage (presigned URLs)
+• Caching: Redis 7+
+• PDF Generation: ReportLab
+• Background Tasks: Dramatiq
+• AI Integration: OpenAI API (GPT-3.5-turbo)
+• Email: SendGrid
+• Testing: Pytest (114 tests, 80%+ coverage)
+```
 
-## 📋 Prerequisites
+**Performance Optimizations:**
 
-- Python 3.11+
-- PostgreSQL 15+
-- Firebase project with Admin SDK credentials
-- Google Cloud Storage bucket
-- Redis 7+ (optional, for caching)
+- ✅ Async database queries (non-blocking I/O)
+- ✅ Connection pooling (20 connections, 10 overflow)
+- ✅ Presigned URLs (direct client→GCS, no server load)
+- ✅ Redis caching (frequently accessed data)
+- ✅ Pagination on all list endpoints
+- ✅ Database indexing (foreign keys, status fields)
+- ✅ Background tasks (Dramatiq)
+- ✅ Query timeout (5 seconds)
+
+---
+
+## 📊 Database Schema (28 Tables)
+
+### Identity & RBAC
+
+- **`users`** - Main user table (firebase_uid, username, email, role, status, campus_id, major_id)
+- **`roles`** - Role definitions
+- **`user_roles`** - Many-to-many user-role mapping
+- **`campuses`** - 4 campuses (H=Hanoi, D=DaNang, C=CanTho, S=HCM)
+- **`majors`** - Programs (C=Computing, B=Business, D=Design)
+- **`username_sequences`** - Collision tracking for username generation
+- **`student_sequences`** - Student ID generation tracking
+- **`device_tokens`** - FCM push notification tokens
+
+### Academic
+
+- **`semesters`** - Academic terms (Fall, Spring, Summer)
+- **`courses`** - Course catalog (course_code, name, credits, prerequisites as JSONB)
+- **`course_sections`** - Course offerings (section_code, instructor, max_students, schedule as JSONB)
+- **`enrollments`** - Student registrations (student_id, course_section_id, status, grade)
+- **`assignments`** - Coursework (title, type, max_points, weight, due_date)
+- **`grades`** - Student grades (enrollment_id, assignment_name, grade_value, approval_status)
+- **`attendance`** - Attendance records (enrollment_id, date, status, notes)
+- **`section_schedules`** - Class schedules (section_id, day_of_week, start_time, end_time, room)
+
+### Financial
+
+- **`fee_structures`** - Fee templates (campus_id, major_id, semester_id, fee_type, amount)
+- **`invoices`** - Student bills (invoice_number, student_id, total_amount, paid_amount, status)
+- **`invoice_lines`** - Invoice items (invoice_id, description, qty, unit_price, amount)
+- **`payments`** - Payment records (invoice_id, amount, payment_method, transaction_id, status)
+
+### Documents
+
+- **`documents`** - File metadata (title, document_type, file_url, file_size, user_id)
+- **`document_requests`** - Official document requests (document_type, purpose, status, delivery_method)
+- **`announcements`** - Campus announcements (title, content, author_id, target_audience, publish_date)
+
+### Communication
+
+- **`chat_rooms`** - Chat metadata (firebase_room_id, type, section_id)
+- **`chat_participants`** - Room membership (room_id, user_id, role)
+- **`support_tickets`** - Help desk (subject, description, category, priority, status, user_id, assigned_to)
+- **`ticket_events`** - Ticket history (ticket_id, event_type, description, created_by)
+- **`notifications`** - User notifications (user_id, title, message, type, is_read, action_url)
+
+### System
+
+- **`system_settings`** - App configuration
+- **`idempotency_keys`** - Payment deduplication
+- **`audit_logs`** - System audit trail
+
+---
+
+## 🔐 Authentication Flow
+
+### Mobile App (Students) - Custom Token Flow
+
+```
+1. Student enters: student_id (username) + password
+2. POST /api/v1/auth/student-login
+3. Backend verifies credentials in PostgreSQL
+4. Backend creates Firebase custom token with claims:
+   {
+     "role": "student",
+     "campus_id": 1,
+     "campus": "D",
+     "major": "C",
+     "db_user_id": 123,
+     "username": "HieuNDGCD220033"
+   }
+5. Mobile app: signInWithCustomToken(customToken)
+6. Get Firebase ID token
+7. All API calls: Authorization: Bearer <ID_TOKEN>
+```
+
+### Admin/Teacher Web Portal
+
+```
+1. User enters username
+2. POST /api/v1/auth/username-to-email
+3. Backend returns email
+4. Frontend: Firebase signInWithEmailAndPassword(email, password)
+5. Get ID token
+6. Optional: POST /api/v1/auth/session for session cookie
+7. All API calls: Authorization: Bearer <ID_TOKEN>
+```
+
+### Token Verification
+
+Every protected endpoint uses:
+
+```python
+@router.get("/protected")
+async def protected(current_user = Depends(verify_firebase_token)):
+    # current_user contains decoded Firebase token:
+    # {
+    #   "uid": "firebase_uid",
+    #   "email": "user@example.com",
+    #   "role": "student",
+    #   "campus_id": 1,
+    #   ...
+    # }
+```
+
+---
+
+## 📡 API Endpoints (60+ Total)
+
+### Authentication (6 endpoints)
+
+```
+POST   /api/v1/auth/username-to-email     # Convert username → email
+POST   /api/v1/auth/student-login          # Student login (custom token)
+POST   /api/v1/auth/session                # Create session cookie
+GET    /api/v1/auth/me                     # Get current user profile
+POST   /api/v1/auth/logout                 # Logout
+PUT    /api/v1/auth/change-password        # Change password
+```
+
+### Mobile App - "Me" Endpoints (9 endpoints)
+
+```
+GET    /api/v1/me/profile                  # My profile
+PATCH  /api/v1/me/profile                  # Update profile
+GET    /api/v1/me/schedule                 # My class schedule
+GET    /api/v1/me/enrollments              # My enrollments
+GET    /api/v1/me/grades                   # My grades
+GET    /api/v1/me/attendance               # My attendance
+GET    /api/v1/me/invoices                 # My invoices
+GET    /api/v1/me/documents                # My document requests
+GET    /api/v1/me/gpa                      # My GPA calculation
+```
+
+### Mobile App - Student Portal (5 endpoints)
+
+```
+GET    /api/v1/student-portal/dashboard           # Dashboard stats
+GET    /api/v1/student-portal/my-courses          # Enrolled courses
+GET    /api/v1/student-portal/course/{id}         # Course details
+GET    /api/v1/student-portal/grades              # All grades
+GET    /api/v1/student-portal/upcoming-classes    # Upcoming classes
+```
+
+### User Management (10+ endpoints)
+
+```
+POST   /api/v1/users                       # Create user (auto-gen username)
+POST   /api/v1/users/bulk                  # Bulk create users
+GET    /api/v1/users                       # List users (paginated)
+GET    /api/v1/users/search                # Search users
+GET    /api/v1/users/role/{role}           # Get users by role
+GET    /api/v1/users/{user_id}             # Get user details
+PUT    /api/v1/users/{user_id}             # Update user
+DELETE /api/v1/users/{user_id}             # Delete user
+```
+
+### Academic (40+ endpoints)
+
+```
+# Programs/Majors
+POST   /api/v1/academic/programs
+GET    /api/v1/academic/programs
+PUT/PATCH/DELETE /api/v1/academic/programs/{id}
+
+# Courses
+POST   /api/v1/academic/courses
+GET    /api/v1/academic/courses            # Paginated, filterable
+PUT/PATCH /api/v1/academic/courses/{id}
+
+# Sections
+POST   /api/v1/academic/sections
+GET    /api/v1/academic/sections
+
+# Enrollments
+POST   /api/v1/academic/enrollments        # Enroll student
+GET    /api/v1/academic/enrollments
+GET    /api/v1/academic/enrollments/my
+DELETE /api/v1/academic/enrollments/{id}
+
+# Grades (with approval workflow)
+POST   /api/v1/academic/assignments/{id}/grades
+GET    /api/v1/academic/grades
+GET/PUT/DELETE /api/v1/academic/grades/{id}
+POST   /api/v1/academic/grades/submit/{section_id}
+POST   /api/v1/academic/grades/approve/{section_id}
+POST   /api/v1/academic/grades/reject/{section_id}
+POST   /api/v1/academic/grades/publish/{section_id}
+
+# Attendance
+POST   /api/v1/academic/attendance/bulk
+GET    /api/v1/academic/attendance
+PUT/DELETE /api/v1/academic/attendance/{id}
+GET    /api/v1/academic/attendance/compliance/section/{id}
+GET    /api/v1/academic/attendance/at-risk
+
+# GPA & Academic Standing
+GET    /api/v1/academic/students/my/gpa
+GET    /api/v1/academic/students/my/academic-standing
+
+# Semesters
+POST/GET/PUT /api/v1/academic/semesters
+GET    /api/v1/academic/semesters/current
+```
+
+### Finance (10+ endpoints)
+
+```
+POST   /api/v1/finance/invoices
+GET    /api/v1/finance/invoices
+GET/PUT/DELETE /api/v1/finance/invoices/{id}
+
+POST   /api/v1/finance/payments            # Idempotent
+GET    /api/v1/finance/payments
+
+GET    /api/v1/finance/students/my/summary
+GET    /api/v1/finance/students/{id}/summary
+GET    /api/v1/finance/semesters/{id}/summary
+```
+
+### Documents (12+ endpoints)
+
+```
+POST   /api/v1/documents/upload-url        # Presigned upload URL
+POST   /api/v1/documents
+GET    /api/v1/documents
+GET    /api/v1/documents/{id}/download-url
+DELETE /api/v1/documents/{id}
+
+POST   /api/v1/documents/requests
+GET    /api/v1/documents/requests
+PUT    /api/v1/documents/requests/{id}
+
+POST/GET /api/v1/documents/announcements
+```
+
+### Support (8 endpoints)
+
+```
+POST   /api/v1/support/tickets
+GET    /api/v1/support/tickets
+GET/PUT /api/v1/support/tickets/{id}
+POST   /api/v1/support/tickets/{id}/events
+GET    /api/v1/support/tickets/{id}/events
+GET    /api/v1/support/stats/summary
+```
+
+**Additional Modules:**
+
+- **Announcements** (7 endpoints): CRUD, publish/unpublish
+- **Notifications** (8 endpoints): CRUD, mark-read, SSE stream
+- **Dashboard** (6 endpoints): Stats, analytics, activity
+- **Search** (2 endpoints): Global search, suggestions
+- **Bulk Operations** (8 endpoints): Bulk update/delete
+- **Import/Export** (14 endpoints): CSV import/export, templates
+- **Campuses** (9 endpoints): Management, stats, transfers
+- **Audit Logs** (3 endpoints): View logs, stats, export
+
+**See [API_REFERENCE.md](./API_REFERENCE.md) for complete documentation.**
+
+---
+
+## 🎯 Key Features
+
+### 1. Auto-Generated Vietnamese Usernames
+
+```python
+# Input: Nguyen Dinh Hieu, Computing, DaNang, entered 2022
+# Output: HieuNDGCD220033
+# Pattern: {FirstName}{Initials}{Major}{Campus}{YY}{Sequence}
+```
+
+### 2. Weighted GPA Calculation
+
+```python
+def calculate_gpa(enrollments):
+    total_grade_points = 0
+    total_credits = 0
+
+    for enrollment in enrollments:
+        grade_point = GRADE_SCALE[enrollment.letter_grade]  # A=4.0, B=3.0, etc.
+        credits = enrollment.section.course.credits
+        total_grade_points += grade_point * credits
+        total_credits += credits
+
+    return total_grade_points / total_credits
+```
+
+### 3. Grade Approval Workflow
+
+```
+draft → submitted → under_review → approved → published
+                    ↓
+                rejected (with reason)
+```
+
+### 4. Idempotent Payments
+
+```python
+# Prevents duplicate payments
+headers = {"Idempotency-Key": "payment-12345"}
+POST /api/v1/finance/payments
+# If called again with same key → returns cached response
+```
+
+### 5. Presigned URLs for Scalable File Storage
+
+```python
+# Upload flow:
+1. POST /api/v1/documents/upload-url
+   → Returns: { "upload_url": "https://gcs.../signed-url", "file_id": 123 }
+2. Client uploads directly to GCS using presigned URL
+3. POST /api/v1/documents { "file_id": 123, "title": "..." }
+
+# Download flow:
+GET /api/v1/documents/{id}/download-url
+   → Returns: { "download_url": "https://gcs.../signed-url" }
+```
+
+### 6. Attendance Compliance Tracking
+
+```python
+# Thresholds:
+≥ 75%: Compliant
+50-74%: At Risk
+25-49%: Exam Ineligible
+< 25%: Auto Fail
+
+# Endpoints:
+GET /api/v1/academic/attendance/at-risk
+GET /api/v1/academic/attendance/compliance/section/{id}
+```
+
+---
+
+## 🔧 Backend Services
+
+**Key Service Files:**
+
+```
+app/services/
+├── auth_service.py          # Authentication logic
+├── gpa_service.py           # GPA calculation
+├── enrollment_service.py    # Enrollment validation
+├── username_generator.py    # Vietnamese username generation
+├── cloudinary_service.py    # File upload handling
+└── notification_service.py  # Push notifications
+```
+
+**Username Generator Example:**
+
+```python
+# Full name: "Nguyễn Đình Hiếu"
+# Output: "HieuNDG"
+# Logic:
+1. Remove Vietnamese accents: "Nguyen Dinh Hieu"
+2. Extract first name: "Hieu"
+3. Get initials from middle+last: "NDH" → "NDG" (G=Greenwich)
+4. Combine: "HieuNDG"
+5. Add campus/major/year: "HieuNDGCD220033"
+```
+
+---
 
 ## 🚀 Quick Start (Development)
 
@@ -101,26 +457,32 @@ notepad .env
 **Minimum required configurations:**
 
 ```env
+# Database
 DATABASE_URL=postgresql+asyncpg://user:password@localhost/greenwich_dev
+
+# Security
 SECRET_KEY=your-secret-key-min-32-chars
+
+# Firebase
 FIREBASE_PROJECT_ID=your-firebase-project-id
 FIREBASE_CREDENTIALS_PATH=./credentials/serviceAccountKey.json
-GCP_PROJECT_ID=your-gcp-project-id
+
+# Google Cloud Storage (optional)
 GCS_BUCKET_NAME=greenwich-documents-dev
 GOOGLE_APPLICATION_CREDENTIALS=./credentials/gcs-credentials.json
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,http://localhost:19006
 ```
 
 ### 3. Setup Database
 
 ```powershell
-# Initialize Alembic (if not already done)
-alembic init migrations
-
 # Run migrations
 alembic upgrade head
 
-# (Optional) Seed initial data
-python scripts/seed_data.py
+# Seed initial data (optional)
+python seed_essential_data.py
 ```
 
 ### 4. Run Development Server
@@ -147,62 +509,7 @@ pytest tests/unit/test_gpa_service.py
 pytest -m integration
 ```
 
-## 📚 Documentation
-
-### Getting Started
-
-- **[Quick Start](./docs/QUICKSTART.md)** - Get up and running quickly ⚡
-- **[Quick Deploy](./docs/QUICK_DEPLOY.md)** - Fast deployment checklist 🚀
-- **[Full Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Complete deployment 📦
-- **[Environment Setup](./.env.example)** - Environment variable template
-
-### API Documentation
-
-- **[API Reference](./API_REFERENCE.md)** - All 60+ endpoints documented 📖
-- **[Interactive Docs](http://localhost:8000/docs)** - Swagger UI (when server running)
-- **[ReDoc](http://localhost:8000/redoc)** - Alternative API documentation
-
-### Architecture & Design
-
-- **[Architecture Guide](./docs/ARCHITECTURE.md)** - Complete system architecture 🏗️
-- **[Technology Stack](./docs/ARCHITECTURE.md#-technology-stack)** - Tech overview
-- **[Database Schema](./docs/ARCHITECTURE.md#-database-schema-28-tables)** - All 28 tables
-
-### Development
-
-- **[Testing Guide](./docs/TESTING_GUIDE.md)** - How to write and run tests 🧪
-- **[Firebase Setup](./docs/FIREBASE_MIGRATION_GUIDE.md)** - Firebase configuration 🔥
-- **[GCS Setup](./docs/GCS_SETUP_GUIDE.md)** - Google Cloud Storage setup ☁️
-
-## 📊 API Endpoints
-
-### Overview by Module
-
-| Module          | Endpoints | Status                  |
-| --------------- | --------- | ----------------------- |
-| Authentication  | 5         | ✅ Complete             |
-| User Management | 7         | ✅ Complete             |
-| Academic        | 15+       | ✅ Complete             |
-| Finance         | 10+       | ✅ Complete             |
-| Documents       | 12+       | ✅ Complete             |
-| Support Tickets | 10+       | ✅ Complete             |
-| **Total**       | **60+**   | **✅ Production Ready** |
-
-### Sample Endpoints
-
-```http
-POST   /api/v1/auth/student-login          # Student mobile login
-GET    /api/v1/auth/me                     # Get current user
-POST   /api/v1/users                       # Create user
-POST   /api/v1/academic/enrollments        # Enroll in course
-GET    /api/v1/academic/students/my/gpa    # Get GPA
-POST   /api/v1/finance/invoices            # Create invoice
-POST   /api/v1/finance/payments            # Record payment
-POST   /api/v1/documents/upload-url        # Generate upload URL
-POST   /api/v1/support/tickets             # Create support ticket
-```
-
-**See [API_REFERENCE.md](./API_REFERENCE.md) for complete documentation.**
+---
 
 ## 🧪 Testing
 
@@ -235,32 +542,31 @@ pytest -m finance        # Finance module tests
 pytest tests/unit/test_gpa_service.py -v
 ```
 
-**See [TESTING.md](./TESTING.md) for detailed testing guide.**
+**Key Test Files:**
+
+```
+tests/unit/test_gpa_service.py
+tests/unit/test_username_generator.py
+tests/integration/test_enrollment_workflow.py
+tests/integration/test_finance_idempotency.py
+```
+
+---
 
 ## 🚢 Deployment
 
-### Quick Deployment (3 Options)
+### Quick Deployment Options
 
 #### Option 1: Ubuntu/Linux VPS (Recommended)
 
 ```bash
-# See QUICK_DEPLOY.md for step-by-step instructions
+# See docs/QUICK_DEPLOY.md for step-by-step instructions
 # Uses: Nginx + Gunicorn + Supervisor + PostgreSQL
 # Time: ~30 minutes
 # Cost: ~$20-50/month
 ```
 
-#### Option 2: Heroku (Quickest)
-
-```bash
-heroku create greenwich-api
-heroku addons:create heroku-postgresql:standard-0
-git push heroku main
-# Time: ~10 minutes
-# Cost: ~$25-50/month
-```
-
-#### Option 3: Docker (Most Portable)
+#### Option 2: Docker (Most Portable)
 
 ```bash
 docker-compose up -d
@@ -268,61 +574,145 @@ docker-compose up -d
 # Cost: Varies by hosting
 ```
 
-**See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete deployment instructions.**
+### Deployment Scripts
+
+```powershell
+# Development
+./run_dev.ps1                 # Start dev server with auto-reload
+
+# Production
+./deploy-production.ps1       # Deploy to production server
+./start_servers.ps1           # Start all services
+./stop_servers.ps1            # Stop all services
+
+# Database
+alembic upgrade head          # Run migrations
+python seed_essential_data.py # Seed initial data
+```
+
+### Production Features
+
+- ✅ Connection pooling (20 connections, 10 overflow)
+- ✅ Query timeout (5 seconds)
+- ✅ Request/Response logging with request IDs
+- ✅ Error tracking (Sentry integration ready)
+- ✅ CORS configuration (explicit allowlist)
+- ✅ Rate limiting (60/min, 1000/hour)
+- ✅ Audit middleware (logs all API actions)
+- ✅ Idempotency for payments
+- ✅ Pagination on all list endpoints
+
+**See [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) for complete instructions.**
+
+---
+
+## 📚 Documentation
+
+### Getting Started
+
+- **[Quick Start](./docs/QUICKSTART.md)** - Get up and running quickly ⚡
+- **[Quick Deploy](./docs/QUICK_DEPLOY.md)** - Fast deployment checklist 🚀
+- **[Full Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Complete deployment 📦
+- **[Environment Setup](./.env.example)** - Environment variable template
+
+### API Documentation
+
+- **[API Reference](./API_REFERENCE.md)** - All 60+ endpoints documented 📖
+- **[Interactive Docs](http://localhost:8000/docs)** - Swagger UI (when server running)
+- **[ReDoc](http://localhost:8000/redoc)** - Alternative API documentation
+
+### Architecture & Design
+
+- **[Architecture Guide](./docs/ARCHITECTURE.md)** - Complete system architecture 🏗️
+- **[Testing Guide](./docs/TESTING_GUIDE.md)** - How to write and run tests 🧪
+- **[Firebase Setup](./docs/FIREBASE_MIGRATION_GUIDE.md)** - Firebase configuration 🔥
+- **[GCS Setup](./docs/GCS_SETUP_GUIDE.md)** - Google Cloud Storage setup ☁️
+
+---
 
 ## 🔐 Security Features
 
-- ✅ Firebase token verification
+- ✅ Firebase token verification with clock skew tolerance (60s)
 - ✅ Role-based access control (student/teacher/admin)
 - ✅ Password hashing (bcrypt, cost=12)
 - ✅ SQL injection prevention (parameterized queries)
 - ✅ XSS protection (Pydantic validation)
-- ✅ CORS configuration
+- ✅ CORS configuration (explicit allowlist)
 - ✅ Presigned URLs with expiration (1 hour)
 - ✅ File type and size validation
 - ✅ Payment idempotency (prevent duplicates)
+- ✅ Audit logging (all API actions)
 
-## 📈 Performance
+---
 
-### Optimizations Implemented
-
-- ✅ Async database queries (non-blocking I/O)
-- ✅ Connection pooling (SQLAlchemy)
-- ✅ Presigned URLs (direct client→GCS, no server load)
-- ✅ Redis caching (frequently accessed data)
-- ✅ Pagination (all list endpoints)
-- ✅ Database indexing (foreign keys)
-- ✅ Background tasks (Dramatiq)
-
-### Expected Performance
-
-- API response time: <100ms (cached), <500ms (database queries)
-- File upload: Direct to GCS (no server bandwidth)
-- Concurrent users: 100+ (with proper scaling)
-
-## 🗂️ Project Structure
+## 📦 Project Structure
 
 ```
 backend/
 ├── app/
-│   ├── core/              # Configuration, database, security
-│   ├── models/            # SQLAlchemy models (28 tables)
-│   ├── schemas/           # Pydantic schemas for validation
-│   ├── routers/           # API endpoints (6 modules)
-│   ├── services/          # Business logic (8 services)
-│   └── utils/             # Helper functions
+│   ├── main.py                # FastAPI application
+│   ├── core/                  # Configuration, database, security
+│   │   ├── settings.py        # Environment settings
+│   │   ├── database.py        # Async database connection
+│   │   ├── firebase.py        # Firebase initialization
+│   │   ├── security.py        # Authentication & RBAC
+│   │   ├── rbac.py            # Role-based access control
+│   │   ├── exceptions.py      # Custom exceptions
+│   │   └── idempotency.py     # Payment deduplication
+│   ├── models/                # SQLAlchemy models (28 tables)
+│   │   ├── user.py
+│   │   ├── academic.py
+│   │   ├── finance.py
+│   │   ├── document.py
+│   │   ├── communication.py
+│   │   └── ...
+│   ├── schemas/               # Pydantic schemas for validation
+│   ├── routers/               # API endpoints (23 routers)
+│   │   ├── auth.py
+│   │   ├── users.py
+│   │   ├── academic.py
+│   │   ├── finance.py
+│   │   ├── documents.py
+│   │   ├── support.py
+│   │   ├── me.py              # Mobile app endpoints
+│   │   ├── student_portal.py  # Student-facing APIs
+│   │   └── ...
+│   ├── services/              # Business logic (8 services)
+│   │   ├── auth_service.py
+│   │   ├── gpa_service.py
+│   │   ├── enrollment_service.py
+│   │   ├── username_generator.py
+│   │   └── ...
+│   ├── middleware/            # Custom middleware
+│   │   └── audit.py           # Audit logging
+│   └── utils/                 # Helper functions
 ├── tests/
-│   ├── unit/              # Unit tests (80 tests)
-│   └── integration/       # Integration tests (34 tests)
-├── migrations/            # Alembic database migrations
-├── scripts/               # Utility scripts
-├── credentials/           # Firebase & GCS credentials (gitignored)
-├── requirements.txt       # Python dependencies
-├── .env.example          # Environment template
-├── pytest.ini            # Pytest configuration
-├── alembic.ini           # Alembic configuration
-└── Documentation files (8 files)
+│   ├── unit/                  # Unit tests (80 tests)
+│   └── integration/           # Integration tests (34 tests)
+├── migrations/                # Alembic database migrations
+├── scripts/                   # Utility scripts
+│   ├── seed_essential_data.py
+│   ├── seed_academic_data.py
+│   └── ...
+├── credentials/               # Firebase & GCS credentials (gitignored)
+├── docs/                      # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── DEPLOYMENT_GUIDE.md
+│   ├── QUICK_DEPLOY.md
+│   ├── QUICKSTART.md
+│   ├── TESTING_GUIDE.md
+│   ├── FIREBASE_MIGRATION_GUIDE.md
+│   └── GCS_SETUP_GUIDE.md
+├── requirements.txt           # Python dependencies
+├── .env.example              # Environment template
+├── pytest.ini                # Pytest configuration
+├── alembic.ini               # Alembic configuration
+├── API_REFERENCE.md          # Complete API documentation
+├── PRODUCTION_DEPLOYMENT_GUIDE.md
+└── README.md                 # This file
 ```
+
+---
 
 ## 🛠️ Development Commands
 
@@ -342,81 +732,31 @@ gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
 pytest                                    # All tests
 pytest -v --cov=app                      # With coverage
 pytest -m unit                           # Unit tests only
-python run_tests.py                      # Using test runner
 
 # Code quality
 black app/                               # Format code
-flake8 app/                             # Lint code
+ruff app/                               # Lint code
 mypy app/                               # Type checking
 ```
 
-## 📦 Database Schema
+---
 
-### Tables (28 total)
+## 🎯 Backend Status Summary
 
-- **Users & Auth**: users, device_tokens
-- **Academic**: courses, sections, enrollments, grades, attendance, schedules
-- **Campus**: campuses, majors, semesters
-- **Finance**: invoices, invoice_lines, payments, fee_structures
-- **Documents**: documents, document_requests, announcements
-- **Support**: support_tickets, ticket_events
-- **Chat**: chat_rooms, chat_participants (Firestore integration ready)
-
-**See [VISUAL_OVERVIEW.md](./VISUAL_OVERVIEW.md) for ER diagram.**
-
-## 🤝 Contributing
-
-This is a final year project. For questions or issues:
-
-1. Check documentation files
-2. Review test cases for examples
-3. Check API documentation at `/docs`
-
-## 📄 License
-
-This project is part of a final year project at Greenwich University Vietnam.
-
-## 👥 Team
-
-- **Developer**: Nguyen Dinh Hieu
-- **Institution**: Greenwich University Vietnam
-- **Program**: Final Year Project
-- **Year**: 2024-2025
-
-## 🎯 What's Next?
-
-### For Backend:
-
-- ✅ Backend is 95% complete and production-ready
-- ⏳ Optional: Add analytics dashboard
-- ⏳ Optional: Add email notifications
-- ⏳ Optional: Add push notifications (FCM)
-
-### For Project:
-
-1. **Deploy Backend** (Use DEPLOYMENT_GUIDE.md)
-2. **Build Frontend**:
-   - React Native (Mobile - Students)
-   - React (Admin Dashboard)
-   - Next.js (Public Website)
-3. **Integrate & Test**
-4. **Launch! 🚀**
-
-## 📞 Support & Resources
-
-**Documentation:**
-
-- API Reference: [API_REFERENCE.md](./API_REFERENCE.md)
-- Deployment: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | [QUICK_DEPLOY.md](./QUICK_DEPLOY.md)
-- Testing: [TESTING.md](./TESTING.md)
-- Architecture: [VISUAL_OVERVIEW.md](./VISUAL_OVERVIEW.md)
-
-**Useful Links:**
-
-- FastAPI Docs: https://fastapi.tiangolo.com
-- SQLAlchemy: https://docs.sqlalchemy.org
-- Firebase Admin: https://firebase.google.com/docs/admin/setup
-- PostgreSQL: https://www.postgresql.org/docs
+| Component           | Status           | Details                           |
+| ------------------- | ---------------- | --------------------------------- |
+| **Core**            | ✅ Complete      | FastAPI + PostgreSQL + Firebase   |
+| **Authentication**  | ✅ Complete      | Custom tokens + ID tokens         |
+| **User Management** | ✅ Complete      | Auto-gen usernames, RBAC          |
+| **Academic**        | ✅ Complete      | Courses, enrollments, grades, GPA |
+| **Finance**         | ✅ Complete      | Invoices, payments, idempotency   |
+| **Documents**       | ✅ Complete      | GCS storage, presigned URLs       |
+| **Support**         | ✅ Complete      | Ticketing system, SLA tracking    |
+| **Mobile APIs**     | ✅ Complete      | /me endpoints, student portal     |
+| **Admin APIs**      | ✅ Complete      | Dashboard, bulk ops, analytics    |
+| **Testing**         | ✅ 80%+ Coverage | 114 tests passing                 |
+| **Documentation**   | ✅ Complete      | API Reference, guides             |
+| **Deployment**      | ✅ Ready         | Scripts, guides, configs          |
 
 ---
 
@@ -434,290 +774,39 @@ This project is part of a final year project at Greenwich University Vietnam.
 
 **Your Greenwich University Backend is ready to deploy! 🚀**
 
-For deployment instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) or [QUICK_DEPLOY.md](./QUICK_DEPLOY.md)
+---
 
-- `FIREBASE_*`: Firebase Admin SDK credentials
-- `GCS_BUCKET_NAME`: Google Cloud Storage bucket
-- `OPENAI_API_KEY`: OpenAI API key
-- `SECRET_KEY`: Generate a secure key
+## 📞 Support & Resources
 
-### 3. Initialize Database
+**Documentation:**
 
-```powershell
-# Install Alembic (if not already installed)
-pip install alembic
+- API Reference: [API_REFERENCE.md](./API_REFERENCE.md)
+- Deployment: [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) | [docs/QUICK_DEPLOY.md](./docs/QUICK_DEPLOY.md)
+- Testing: [docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)
+- Architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
 
-# Initialize Alembic
-alembic init alembic
+**Useful Links:**
 
-# Create initial migration
-alembic revision --autogenerate -m "Initial schema"
-
-# Run migrations
-alembic upgrade head
-```
-
-### 4. Run Development Server
-
-```powershell
-# Using uvicorn directly
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Or using Python
-python -m app.main
-```
-
-The API will be available at:
-
-- **API**: http://localhost:8000
-- **Docs**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
-
-## 📁 Project Structure
-
-```
-backend/
-├── app/
-│   ├── main.py                    # FastAPI application
-│   ├── core/                      # Core configuration
-│   │   ├── settings.py           # Environment settings
-│   │   ├── database.py           # Database connection
-│   │   ├── firebase.py           # Firebase initialization
-│   │   ├── security.py           # Authentication & authorization
-│   │   └── exceptions.py         # Custom exceptions
-│   ├── models/                    # SQLAlchemy models
-│   │   ├── user.py
-│   │   ├── academic.py
-│   │   ├── finance.py
-│   │   ├── document.py
-│   │   └── communication.py
-│   ├── schemas/                   # Pydantic schemas (to be created)
-│   ├── routers/                   # API endpoints (to be created)
-│   ├── services/                  # Business logic (to be created)
-│   └── utils/                     # Utility functions (to be created)
-├── tests/                         # Test suite
-├── alembic/                       # Database migrations
-├── requirements.txt               # Python dependencies
-├── .env.example                   # Environment template
-└── README.md                      # This file
-```
-
-## 🔐 Authentication Flow
-
-### ✅ Firebase-Only Authentication (Updated Oct 21, 2025)
-
-All user types now use Firebase authentication. JWT tokens have been removed.
-
-### Mobile App (Students)
-
-**Option 1: Custom Token Flow (Recommended for Mobile)**
-
-1. User enters student_id + password
-2. POST `/api/v1/auth/student-login`
-3. Backend verifies credentials in PostgreSQL
-4. Backend creates Firebase custom token with claims
-5. Client calls `signInWithCustomToken(customToken)`
-6. Client receives Firebase ID token
-7. All API requests include: `Authorization: Bearer <FIREBASE_ID_TOKEN>`
-
-**Option 2: Email/Password Flow**
-
-1. POST `/api/v1/auth/username-to-email` with student_id
-2. Backend returns user's email address
-3. Client calls `signInWithEmailAndPassword(email, password)`
-4. Client receives Firebase ID token
-5. All API requests include: `Authorization: Bearer <FIREBASE_ID_TOKEN>`
-
-### Admin/Teacher Web Portal
-
-1. User enters username
-2. POST `/api/v1/auth/username-to-email` with username
-3. Backend returns email address
-4. Client calls Firebase `signInWithEmailAndPassword(email, password)`
-5. Client receives Firebase ID token
-6. All API requests include: `Authorization: Bearer <FIREBASE_ID_TOKEN>`
-
-### Token Verification
-
-- All endpoints verify Firebase ID tokens only
-- Tokens are validated with Firebase Admin SDK
-- Token revocation is checked on each request
-- No JWT tokens accepted (removed Oct 21, 2025)
-
-**Migration Guide:** See [FIREBASE_MIGRATION_COMPLETE.md](./FIREBASE_MIGRATION_COMPLETE.md)
-
-## 🗄️ Database Schema
-
-### Core Tables (28 total)
-
-**Identity & RBAC**
-
-- `users` - User accounts with Firebase integration
-- `campuses` - Ha Noi, Da Nang, Can Tho, Ho Chi Minh
-- `majors` - Computing, Business, Design
-- `device_tokens` - FCM push notification tokens
-
-**Academic**
-
-- `semesters` - Academic terms
-- `courses` - Course catalog
-- `course_sections` - Course offerings
-- `schedules` - Class timetables
-- `enrollments` - Student registrations
-- `assignments` - Coursework
-- `grades` - Student grades
-- `attendance` - Attendance tracking
-
-**Financial**
-
-- `fee_structures` - Fee templates
-- `invoices` - Student invoices
-- `invoice_lines` - Invoice line items
-- `payments` - Payment records
-
-**Documents & Content**
-
-- `documents` - File metadata
-- `document_requests` - Official document requests
-- `announcements` - Campus announcements
-
-**Communication**
-
-- `chat_rooms` - Chat room metadata
-- `chat_participants` - Room membership
-- `support_tickets` - Help desk tickets
-- `ticket_events` - Ticket history
-
-**System**
-
-- `username_sequences` - Username generation tracking
-- `student_sequences` - Student ID sequences
-
-## 🛠️ API Endpoints
-
-### Authentication
-
-- `POST /api/v1/auth/username-to-email` - Convert username to email
-- `POST /api/v1/auth/student-login` - Student login (custom token)
-- `POST /api/v1/auth/session` - Create session cookie
-- `POST /api/v1/auth/logout` - Logout
-- `GET /api/v1/auth/me` - Get current user
-
-### Academic
-
-- `GET /api/v1/courses` - List courses
-- `GET /api/v1/sections` - List course sections
-- `POST /api/v1/enrollments` - Enroll in course
-- `GET /api/v1/me/schedule` - My schedule
-- `GET /api/v1/me/grades` - My grades
-
-### Finance
-
-- `GET /api/v1/invoices` - List invoices
-- `POST /api/v1/payments` - Record payment
-- `GET /api/v1/me/invoices` - My invoices
-
-### Documents
-
-- `POST /api/v1/documents/upload-url` - Get upload URL
-- `GET /api/v1/documents/{id}` - Download document
-- `POST /api/v1/document-requests` - Request official document
-
-### More endpoints to be implemented...
-
-## 🧪 Testing
-
-```powershell
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app --cov-report=html
-
-# Run specific test file
-pytest tests/test_auth.py
-```
-
-## 🚢 Deployment
-
-### Using Docker
-
-```powershell
-# Build image
-docker build -t academic-portal-api .
-
-# Run container
-docker run -p 8000:8000 --env-file .env academic-portal-api
-```
-
-### Using Docker Compose
-
-```powershell
-docker-compose up -d
-```
-
-## 📝 Development Notes
-
-### Code Quality
-
-```powershell
-# Format code
-black app/
-
-# Lint code
-ruff app/
-
-# Type checking
-mypy app/
-```
-
-### Database Migrations
-
-```powershell
-# Create new migration
-alembic revision --autogenerate -m "Description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback one migration
-alembic downgrade -1
-```
-
-## 🔒 Security Considerations
-
-1. **Authentication**: All endpoints require Firebase ID token
-2. **Authorization**: Role-based access control (RBAC)
-3. **Token Verification**: Always check `check_revoked=True`
-4. **CORS**: Restrict to known origins only
-5. **Rate Limiting**: Implemented per-user and per-IP
-6. **Input Validation**: Pydantic schemas for all requests
-7. **SQL Injection**: Protected by SQLAlchemy ORM
-8. **Password Hashing**: Bcrypt for student passwords
-
-## 📊 Monitoring
-
-- **Logs**: Structured JSON logs
-- **Metrics**: Request timing headers
-- **Health Checks**: `/health` and `/api/v1/health`
-- **Error Tracking**: Sentry integration (optional)
-
-## 🤝 Contributing
-
-1. Create feature branch
-2. Make changes
-3. Write tests
-4. Run code quality checks
-5. Submit pull request
-
-## 📄 License
-
-Proprietary - Greenwich University Vietnam
-
-## 👥 Support
-
-For technical support, contact the development team.
+- FastAPI Docs: https://fastapi.tiangolo.com
+- SQLAlchemy: https://docs.sqlalchemy.org
+- Firebase Admin: https://firebase.google.com/docs/admin/setup
+- PostgreSQL: https://www.postgresql.org/docs
 
 ---
 
-**Built with ❤️ by the Greenwich Vietnam Development Team**
+## 👥 Team
+
+- **Developer**: Nguyen Dinh Hieu
+- **Institution**: Greenwich University Vietnam
+- **Program**: Final Year Project
+- **Year**: 2024-2025
+
+---
+
+## 📄 License
+
+This project is part of a final year project at Greenwich University Vietnam.
+
+---
+
+**Built with ❤️ for Greenwich University Vietnam**

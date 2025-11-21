@@ -1,47 +1,61 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../constants/theme';
 import HomeScreen from '../screens/dashboard/HomeScreen';
 import ScheduleScreen from '../screens/schedule/ScheduleScreen';
 import AcademicScreen from '../screens/academic/AcademicScreen';
+import FinanceScreen from '../screens/finance/FinanceScreen';
+import AnnouncementsScreen from '../screens/announcements/AnnouncementsScreen';
 import DocumentsScreen from '../screens/documents/DocumentsScreen';
-import AIChatScreen from '../screens/chat/AIChatScreen';
+import SupportScreen from '../screens/chat/SupportScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import MoreScreen from '../screens/more/MoreScreen';
 
 const Tab = createBottomTabNavigator();
+const MoreStack = createNativeStackNavigator();
 
-const StudentTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ color, size }) => {
-        const map: Record<string, string> = {
-          Home: 'home',
-          Schedule: 'calendar',
-          Academic: 'school',
-          Documents: 'file-document',
-          'AI Chat': 'chat',
-          Profile: 'account',
-        };
-        return (
-          <MaterialCommunityIcons name={map[route.name] || 'circle'} size={size} color={color} />
-        );
-      },
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.gray,
-      tabBarStyle: { backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.grayLight, height: 60 },
-      tabBarLabelStyle: { fontSize: FONTS.xs, fontWeight: FONTS.medium as any },
-      headerShown: false,
-    })}
-  >
-    <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Schedule" component={ScheduleScreen} />
-    <Tab.Screen name="Academic" component={AcademicScreen} />
-    <Tab.Screen name="Documents" component={DocumentsScreen} />
-    <Tab.Screen name="AI Chat" component={AIChatScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
-  </Tab.Navigator>
+const MoreStackNavigator = () => (
+  <MoreStack.Navigator screenOptions={{ headerShown: false }}>
+    <MoreStack.Screen name="MoreHome" component={MoreScreen} />
+    <MoreStack.Screen name="Finance" component={FinanceScreen} />
+    <MoreStack.Screen name="Announcements" component={AnnouncementsScreen} />
+    <MoreStack.Screen name="Documents" component={DocumentsScreen} />
+    <MoreStack.Screen name="Support" component={SupportScreen} />
+    <MoreStack.Screen name="Profile" component={ProfileScreen} />
+  </MoreStack.Navigator>
 );
+
+const StudentTabs = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ color, size }) => {
+          const map: Record<string, string> = {
+            Home: 'home',
+            Schedule: 'calendar',
+            Academic: 'school',
+            More: 'menu',
+          };
+          return (
+            <MaterialCommunityIcons name={map[route.name] || 'circle'} size={size} color={color} />
+          );
+        },
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.gray,
+        tabBarStyle: { backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.grayLight, height: 60 },
+        tabBarLabelStyle: { fontSize: FONTS.xs, fontWeight: FONTS.medium as any },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Schedule" component={ScheduleScreen} />
+      <Tab.Screen name="Academic" component={AcademicScreen} />
+      <Tab.Screen name="More" component={MoreStackNavigator} />
+    </Tab.Navigator>
+  );
+};
 
 export default StudentTabs;
 

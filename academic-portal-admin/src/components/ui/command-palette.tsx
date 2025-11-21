@@ -70,15 +70,6 @@ export function CommandPalette({ isOpen, onClose, userRole }: CommandPaletteProp
       keywords: ["users", "students", "faculty", "accounts"],
     },
     {
-      id: "nav-content",
-      title: "Content",
-      description: "Manage news and regulations",
-      icon: <FileText className="w-4 h-4" />,
-      action: () => window.location.href = "/content",
-      category: "navigation",
-      keywords: ["content", "news", "regulations", "articles"],
-    },
-    {
       id: "nav-academics",
       title: "Academics",
       description: "Manage programs and courses",
@@ -131,15 +122,6 @@ export function CommandPalette({ isOpen, onClose, userRole }: CommandPaletteProp
       action: () => window.location.href = "/analytics",
       category: "navigation",
       keywords: ["analytics", "reports", "insights", "data"],
-    },
-    {
-      id: "nav-settings",
-      title: "Settings",
-      description: "System configuration",
-      icon: <Settings className="w-4 h-4" />,
-      action: () => window.location.href = "/settings",
-      category: "navigation",
-      keywords: ["settings", "configuration", "preferences"],
     },
 
     // Quick Create Actions

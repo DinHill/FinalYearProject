@@ -58,7 +58,7 @@ class RBACUtils:
     @staticmethod
     def is_admin(user_roles: List[str]) -> bool:
         """Check if user has any admin role"""
-        admin_roles = ["super_admin", "academic_admin", "finance_admin", "support_admin", "content_admin"]
+        admin_roles = ["super_admin", "academic_admin", "finance_admin", "support_admin"]
         return any(role in user_roles for role in admin_roles)
     
     @staticmethod
@@ -109,12 +109,21 @@ def require_roles(*allowed_roles: str):
     async def dependency(user: Dict[str, Any] = Depends(verify_firebase_token)) -> Dict[str, Any]:
         """Check if user has required roles"""
         
-        # Get user roles from custom claims
+        # Get user roles from custom claims - check both 'roles' (array) and 'role' (single)
         user_roles = user.get("roles", [])
+        
+        # If roles array is empty, check for single 'role' claim
+        if not user_roles:
+            single_role = user.get("role")
+            if single_role:
+                user_roles = [single_role]
         
         # Convert single role to list for backward compatibility
         if isinstance(user_roles, str):
             user_roles = [user_roles]
+        
+        # Debug: Log what we're checking
+        logger.info(f"🔐 Role check - User: {user.get('email')}, Roles: {user_roles}, Required: {allowed_roles}, All claims: {user}")
         
         # Check if user has any of the required roles
         if not RBACUtils.has_role(user_roles, list(allowed_roles)):
@@ -148,8 +157,14 @@ def require_all_roles(*required_roles: str):
     async def dependency(user: Dict[str, Any] = Depends(verify_firebase_token)) -> Dict[str, Any]:
         """Check if user has all required roles"""
         
-        # Get user roles from custom claims
+        # Get user roles from custom claims - check both 'roles' (array) and 'role' (single)
         user_roles = user.get("roles", [])
+        
+        # If roles array is empty, check for single 'role' claim
+        if not user_roles:
+            single_role = user.get("role")
+            if single_role:
+                user_roles = [single_role]
         
         # Convert single role to list for backward compatibility
         if isinstance(user_roles, str):
@@ -172,8 +187,53 @@ def require_all_roles(*required_roles: str):
 
 
 def require_admin():
+    """
+    Dependency that allows any authenticated admin to access (READ operations)
+    
+    Usage:
+        @router.get("/dashboard/stats", dependencies=[Depends(require_admin())])
+        
+    This allows all admin roles to READ data, while specific roles are required
+    for CREATE/UPDATE/DELETE operations using require_roles()
+    """
+    async def dependency(user: Dict[str, Any] = Depends(verify_firebase_token)) -> Dict[str, Any]:
+        """Check if user is an authenticated admin"""
+        
+        # Get user roles from custom claims - check both 'roles' (array) and 'role' (single)
+        user_roles = user.get("roles", [])
+        
+        # If roles array is empty, check for single 'role' claim
+        if not user_roles:
+            single_role = user.get("role")
+            if single_role:
+                user_roles = [single_role]
+        
+        # Convert single role to list for backward compatibility
+        if isinstance(user_roles, str):
+            user_roles = [user_roles]
+        
+        # Check if user has any admin role
+        admin_roles = ["super_admin", "academic_admin", "finance_admin", "admin"]
+        has_admin_role = any(role in user_roles for role in admin_roles)
+        
+        if not has_admin_role:
+            logger.warning(
+                f"Access denied for user {user.get('uid')} "
+                f"with roles {user_roles}. Admin access required."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required"
+            )
+        
+        return user
+    
+    return dependency
+
+
+def require_admin():
     """Dependency to require any admin role"""
-    return require_roles("super_admin", "academic_admin", "finance_admin", "support_admin", "content_admin")
+    return require_roles("super_admin", "academic_admin", "finance_admin", "support_admin")
 
 
 def require_teacher_or_admin():

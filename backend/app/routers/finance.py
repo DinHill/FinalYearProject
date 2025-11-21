@@ -7,8 +7,9 @@ Handles financial operations including:
 - Financial summaries for students and semesters
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
+from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,12 +20,13 @@ from app.core.rbac import require_roles, require_student, get_user_campus_access
 from app.core.idempotency import IdempotencyManager
 from fastapi.responses import JSONResponse
 from app.core.exceptions import NotFoundError, BusinessLogicError
-from app.models.user import User
+from app.models.user import User, Campus
 from app.models.finance import Invoice, InvoiceLine, Payment, FeeStructure
 from app.models.academic import Enrollment, Semester
 from app.schemas.base import PaginatedResponse, SuccessResponse
 from app.schemas.finance import (
     InvoiceCreate,
+    InvoiceUpdate,
     InvoiceResponse,
     InvoiceDetailResponse,
     PaymentCreate,
@@ -40,7 +42,7 @@ router = APIRouter(prefix="/finance", tags=["Finance"])
 async def create_invoice(
     invoice_data: InvoiceCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin"))
 ):
     """
     Create a new invoice for a student.
@@ -59,21 +61,21 @@ async def create_invoice(
             and_(
                 User.id == invoice_data.student_id,
                 User.role == "student",
-                User.is_active == True
+                User.status == "active"
             )
         )
     )
     student = student_query.scalar_one_or_none()
     if not student:
-        raise NotFoundError(f"Student with ID {invoice_data.student_id} not found")
+        raise NotFoundError("Student", invoice_data.student_id)
     
-    # Verify semester exists
+    # Verify semester exists - look up by code
     semester_query = await db.execute(
-        select(Semester).where(Semester.id == invoice_data.semester_id)
+        select(Semester).where(Semester.code == invoice_data.semester_code.upper())
     )
     semester = semester_query.scalar_one_or_none()
     if not semester:
-        raise NotFoundError(f"Semester with ID {invoice_data.semester_id} not found")
+        raise NotFoundError("Semester", invoice_data.semester_code)
     
     # Calculate total amount from line items
     total_amount = sum(line.amount for line in invoice_data.lines)
@@ -81,9 +83,9 @@ async def create_invoice(
     # Create invoice
     invoice = Invoice(
         student_id=invoice_data.student_id,
-        semester_id=invoice_data.semester_id,
+        semester_id=semester.id,
         invoice_number=invoice_data.invoice_number,
-        issue_date=invoice_data.issue_date,
+        issued_date=invoice_data.issue_date,  # Changed from issue_date to issued_date
         due_date=invoice_data.due_date,
         total_amount=total_amount,
         status=invoice_data.status or "pending",
@@ -98,7 +100,7 @@ async def create_invoice(
             invoice_id=invoice.id,
             description=line_data.description,
             amount=line_data.amount,
-            quantity=line_data.quantity,
+            qty=line_data.quantity,
             unit_price=line_data.unit_price,
         )
         db.add(line)
@@ -112,13 +114,13 @@ async def create_invoice(
 @router.get("/invoices", response_model=PaginatedResponse[InvoiceResponse])
 async def list_invoices(
     student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
-    semester_id: Optional[int] = Query(None, description="Filter by semester ID"),
+    semester_code: Optional[str] = Query(None, description="Filter by semester code (e.g., F2024, S2025)"),
     status: Optional[str] = Query(None, description="Filter by status"),
-    campus_id: Optional[int] = Query(None, description="Filter by campus ID"),
+    campus_code: Optional[str] = Query(None, description="Filter by campus code (H, D, C, S)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     List invoices with filters (campus-filtered).
@@ -131,17 +133,23 @@ async def list_invoices(
     query = select(Invoice).join(User, Invoice.student_id == User.id)
     
     # Students can only see their own invoices
-    if current_user.role == "student":
-        query = query.where(Invoice.student_id == current_user.id)
+    if "student" in current_user.get("roles", []):
+        query = query.where(Invoice.student_id == current_user["db_user_id"])
     else:
         # Admin - apply campus filtering
-        user_campus_access = await get_user_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, db)
+        user_campus_access = await get_user_campus_access({"uid": current_user["uid"], "roles": current_user.get("roles", [])}, db)
         
-        if campus_id:
-            # Specific campus requested - verify access
+        if campus_code:
+            # Specific campus requested - look up campus by code
+            campus_result = await db.execute(select(Campus).where(Campus.code == campus_code.upper()))
+            campus = campus_query.scalar_one_or_none()
+            if not campus:
+                raise NotFoundError("Campus", campus_code)
+            
+            # Verify access
             if user_campus_access is not None:
-                await check_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, campus_id, db, raise_error=True)
-            query = query.where(User.campus_id == campus_id)
+                await check_campus_access({"uid": current_user["uid"], "roles": current_user.get("roles", [])}, campus.id, db, raise_error=True)
+            query = query.where(User.campus_id == campus.id)
         else:
             # No specific campus - filter by user's campus access
             if user_campus_access is not None:  # Campus-scoped admin
@@ -153,15 +161,20 @@ async def list_invoices(
                         items=[],
                         total=0,
                         page=page,
-                        page_size=page_size,
+                        per_page=page_size,  # Fixed: use per_page instead of page_size
                         pages=0
                     )
         
         if student_id:
             query = query.where(Invoice.student_id == student_id)
     
-    if semester_id:
-        query = query.where(Invoice.semester_id == semester_id)
+    if semester_code:
+        # Look up semester by code
+        semester_result = await db.execute(select(Semester).where(Semester.code == semester_code.upper()))
+        semester = semester_query.scalar_one_or_none()
+        if not semester:
+            raise NotFoundError("Semester", semester_code)
+        query = query.where(Invoice.semester_id == semester.id)
     
     if status:
         query = query.where(Invoice.status == status)
@@ -173,7 +186,7 @@ async def list_invoices(
     
     # Apply pagination
     query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(Invoice.issue_date.desc())
+    query = query.order_by(Invoice.issued_date.desc())  # Changed from issue_date to issued_date
     
     result = await db.execute(query)
     invoices = result.scalars().all()
@@ -182,7 +195,7 @@ async def list_invoices(
         items=invoices,
         total=total,
         page=page,
-        page_size=page_size,
+        per_page=page_size,  # Fixed: use per_page instead of page_size
         pages=(total + page_size - 1) // page_size
     )
 
@@ -191,7 +204,7 @@ async def list_invoices(
 async def get_invoice(
     invoice_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     Get invoice details including line items.
@@ -203,14 +216,14 @@ async def get_invoice(
     query = select(Invoice).where(Invoice.id == invoice_id)
     
     # Students can only see their own invoices
-    if current_user.role == "student":
-        query = query.where(Invoice.student_id == current_user.id)
+    if "student" in current_user.get("roles", []):
+        query = query.where(Invoice.student_id == UUID(current_user["db_user_id"]))
     
     result = await db.execute(query)
     invoice = result.scalar_one_or_none()
     
     if not invoice:
-        raise NotFoundError(f"Invoice with ID {invoice_id} not found")
+        raise NotFoundError("Invoice", invoice_id)
     
     # Get line items
     lines_query = await db.execute(
@@ -224,11 +237,89 @@ async def get_invoice(
     )
     payments = payments_query.scalars().all()
     
+    # Build response with balance computed
+    invoice_dict = invoice.__dict__.copy()
+    invoice_dict['balance'] = invoice.balance  # Add computed property
+    
     return InvoiceDetailResponse(
-        **invoice.__dict__,
+        **invoice_dict,
         lines=lines,
         payments=payments
     )
+
+
+@router.put("/invoices/{invoice_id}", response_model=InvoiceResponse)
+async def update_invoice(
+    invoice_id: int,
+    invoice_data: InvoiceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin"))
+):
+    """
+    Update an invoice.
+    
+    Access: admin, finance_admin
+    
+    Can update:
+    - Due date
+    - Status
+    - Notes
+    """
+    # Get invoice
+    query = select(Invoice).where(Invoice.id == invoice_id)
+    result = await db.execute(query)
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise NotFoundError("Invoice", invoice_id)
+    
+    # Update fields
+    if invoice_data.due_date is not None:
+        invoice.due_date = invoice_data.due_date
+    
+    if invoice_data.status is not None:
+        invoice.status = invoice_data.status
+    
+    if invoice_data.notes is not None:
+        invoice.notes = invoice_data.notes
+    
+    await db.commit()
+    await db.refresh(invoice)
+    
+    return invoice
+
+
+@router.delete("/invoices/{invoice_id}", response_model=SuccessResponse)
+async def delete_invoice(
+    invoice_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin"))
+):
+    """
+    Delete an invoice (soft delete by setting status to cancelled).
+    
+    Access: admin, finance_admin
+    
+    Note: Cannot delete invoices with payments. Use cancel status instead.
+    """
+    # Get invoice
+    query = select(Invoice).where(Invoice.id == invoice_id)
+    result = await db.execute(query)
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise NotFoundError("Invoice", invoice_id)
+    
+    # Check if invoice has payments
+    if invoice.paid_amount > 0:
+        raise BusinessLogicError("Cannot delete invoice with payments. Use cancel status instead.")
+    
+    # Soft delete by setting status to cancelled
+    invoice.status = "cancelled"
+    
+    await db.commit()
+    
+    return SuccessResponse(message=f"Invoice {invoice.invoice_number} cancelled successfully")
 
 
 @router.post("/payments", response_model=PaymentResponse, status_code=201)
@@ -236,7 +327,7 @@ async def create_payment(
     payment_data: PaymentCreate,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     Record a payment for an invoice.
@@ -263,10 +354,10 @@ async def create_payment(
     )
     invoice = invoice_query.scalar_one_or_none()
     if not invoice:
-        raise NotFoundError(f"Invoice with ID {payment_data.invoice_id} not found")
+        raise NotFoundError("Invoice", payment_data.invoice_id)
     
     # Students can only pay their own invoices
-    if current_user.role == "student" and invoice.student_id != current_user.id:
+    if "student" in current_user.get("roles", []) and invoice.student_id != current_user["db_user_id"]:
         raise HTTPException(status_code=403, detail="You can only pay your own invoices")
     
     # Validate payment amount
@@ -284,19 +375,21 @@ async def create_payment(
     payment = Payment(
         invoice_id=payment_data.invoice_id,
         amount=payment_data.amount,
-        paid_at=payment_data.payment_date or datetime.utcnow(),
+        payment_date=payment_data.payment_date or datetime.utcnow(),  # Changed from paid_at to payment_date
         payment_method=payment_data.payment_method,
-        reference_number=payment_data.transaction_reference,
+        transaction_id=payment_data.transaction_id,
+        status=payment_data.status or "completed",
         notes=payment_data.notes,
-        processed_by=current_user.id if hasattr(current_user, 'id') else None,
     )
     db.add(payment)
     
-    # Update invoice status
-    new_balance = remaining_balance - payment_data.amount
+    # Update invoice paid_amount and status
+    invoice.paid_amount = (invoice.paid_amount or Decimal('0')) + payment_data.amount
+    new_balance = invoice.balance  # Recalculate balance after updating paid_amount
+    
     if new_balance == 0:
         invoice.status = "paid"
-    elif new_balance < invoice.total_amount:
+    elif invoice.paid_amount > 0:
         invoice.status = "partial"
     
     await db.commit()
@@ -308,7 +401,7 @@ async def create_payment(
         "invoice_id": payment.invoice_id,
         "amount": float(payment.amount),
         "payment_method": str(payment.payment_method),
-        "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+        "paid_at": payment.payment_date.isoformat() if payment.payment_date else None,  # Changed from paid_at to payment_date
         "status": str(payment.status) if hasattr(payment, 'status') else "completed",
     }
 
@@ -335,11 +428,11 @@ async def list_payments(
     invoice_id: Optional[int] = Query(None, description="Filter by invoice ID"),
     student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
-    campus_id: Optional[int] = Query(None, description="Filter by campus ID"),
+    campus_code: Optional[str] = Query(None, description="Filter by campus code (H, D, C, S)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     List payments with filters (campus-filtered).
@@ -352,17 +445,23 @@ async def list_payments(
     query = select(Payment).join(Invoice).join(User, Invoice.student_id == User.id)
     
     # Students can only see their own payments
-    if current_user.role == "student":
-        query = query.where(Invoice.student_id == current_user.id)
+    if "student" in current_user.get("roles", []):
+        query = query.where(Invoice.student_id == UUID(current_user["db_user_id"]))
     else:
         # Admin - apply campus filtering
-        user_campus_access = await get_user_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, db)
+        user_campus_access = await get_user_campus_access({"uid": current_user["uid"], "roles": current_user.get("roles", [])}, db)
         
-        if campus_id:
-            # Specific campus requested - verify access
+        if campus_code:
+            # Specific campus requested - look up campus by code
+            campus_result = await db.execute(select(Campus).where(Campus.code == campus_code.upper()))
+            campus = campus_result.scalar_one_or_none()
+            if not campus:
+                raise NotFoundError("Campus", campus_code)
+            
+            # Verify access
             if user_campus_access is not None:
-                await check_campus_access({"uid": str(current_user.id), "roles": [current_user.role]}, campus_id, db, raise_error=True)
-            query = query.where(User.campus_id == campus_id)
+                await check_campus_access({"uid": current_user["uid"], "roles": current_user.get("roles", [])}, campus.id, db, raise_error=True)
+            query = query.where(User.campus_id == campus.id)
         else:
             # No specific campus - filter by user's campus access
             if user_campus_access is not None:  # Campus-scoped admin
@@ -374,7 +473,7 @@ async def list_payments(
                         items=[],
                         total=0,
                         page=page,
-                        page_size=page_size,
+                        per_page=page_size,  # Fixed: use per_page instead of page_size
                         pages=0
                     )
         
@@ -403,16 +502,30 @@ async def list_payments(
         items=payments,
         total=total,
         page=page,
-        page_size=page_size,
+        per_page=page_size,  # Fixed: use per_page instead of page_size
         pages=(total + page_size - 1) // page_size
     )
 
 
+@router.get("/students/my/summary", response_model=StudentFinancialSummary)
+async def get_my_financial_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(require_student())
+):
+    """
+    Get financial summary for current student.
+    
+    Access: student
+    """
+    student_id = int(current_user["db_user_id"])
+    return await get_student_financial_summary(student_id, db, current_user)
+
+
 @router.get("/students/{student_id}/summary", response_model=StudentFinancialSummary)
 async def get_student_financial_summary(
-    student_id: UUID,
+    student_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin", "student"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin", "student"))
 ):
     """
     Get financial summary for a student.
@@ -428,7 +541,7 @@ async def get_student_financial_summary(
     - Invoice breakdown by status
     """
     # Students can only see their own summary
-    if current_user.role == "student" and current_user.id != student_id:
+    if "student" in current_user.get("roles", []) and int(current_user["db_user_id"]) != student_id:
         raise HTTPException(status_code=403, detail="You can only view your own financial summary")
     
     # Verify student exists
@@ -442,7 +555,7 @@ async def get_student_financial_summary(
     )
     student = student_query.scalar_one_or_none()
     if not student:
-        raise NotFoundError(f"Student with ID {student_id} not found")
+        raise NotFoundError("Student", student_id)
     
     # Get all invoices for student
     invoices_query = await db.execute(
@@ -471,24 +584,11 @@ async def get_student_financial_summary(
     )
 
 
-@router.get("/students/my/summary", response_model=StudentFinancialSummary)
-async def get_my_financial_summary(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_student())
-):
-    """
-    Get financial summary for current student.
-    
-    Access: student
-    """
-    return await get_student_financial_summary(current_user.id, db, current_user)
-
-
 @router.get("/semesters/{semester_id}/summary", response_model=SemesterFinancialSummary)
 async def get_semester_financial_summary(
     semester_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "finance_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "finance_admin"))
 ):
     """
     Get financial summary for a semester.
@@ -508,7 +608,7 @@ async def get_semester_financial_summary(
     )
     semester = semester_query.scalar_one_or_none()
     if not semester:
-        raise NotFoundError(f"Semester with ID {semester_id} not found")
+        raise NotFoundError("Semester", semester_id)
     
     # Get all invoices for semester
     invoices_query = await db.execute(

@@ -25,16 +25,16 @@ class AuthService:
         password: str
     ) -> tuple[str, Dict[str, Any]]:
         """
-        Student login flow
+        Student/Teacher login flow
         
-        1. Verify student_id and password in PostgreSQL
+        1. Verify username and password in PostgreSQL
         2. Create Firebase custom token with claims
         3. Return custom token and user info
         
         Args:
             db: Database session
-            student_id: Student username (e.g., HieuNDGCD220033)
-            password: Student password
+            student_id: Username (e.g., HieuNDGCD220033 for student, TuanNV1 for teacher)
+            password: User password
         
         Returns:
             tuple: (custom_token, user_dict)
@@ -42,18 +42,18 @@ class AuthService:
         Raises:
             AuthenticationError: If credentials are invalid
         """
-        # Find user by username
+        # Find user by username (student or teacher)
         stmt = select(User).where(
             User.username == student_id,
-            User.role == "student",
+            User.role.in_(["student", "teacher"]),
             User.status == "active"
         )
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
         
         if not user:
-            logger.warning(f"Login attempt with invalid student ID: {student_id}")
-            raise AuthenticationError("Invalid student ID or password")
+            logger.warning(f"Login attempt with invalid username: {student_id}")
+            raise AuthenticationError("Invalid username or password")
         
         # Verify password
         if not user.password_hash:
@@ -62,7 +62,7 @@ class AuthService:
         
         if not SecurityUtils.verify_password(password, user.password_hash):
             logger.warning(f"Failed login attempt for user: {student_id}")
-            raise AuthenticationError("Invalid student ID or password")
+            raise AuthenticationError("Invalid username or password")
         
         # Get campus and major info
         campus = await db.get(Campus, user.campus_id) if user.campus_id else None

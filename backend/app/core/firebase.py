@@ -94,7 +94,7 @@ class FirebaseService:
     @staticmethod
     def verify_id_token(token: str, check_revoked: bool = True) -> Dict[str, Any]:
         """
-        Verify Firebase ID token
+        Verify Firebase ID token with clock skew tolerance
         
         Args:
             token: Firebase ID token
@@ -104,18 +104,26 @@ class FirebaseService:
             Decoded token with user info and claims
         """
         try:
-            decoded_token = auth.verify_id_token(token, check_revoked=check_revoked)
+            # Verify with 60 seconds clock skew tolerance to handle system clock differences
+            # This prevents "Token used too early" errors when clocks are slightly out of sync
+            decoded_token = auth.verify_id_token(
+                token, 
+                check_revoked=check_revoked,
+                clock_skew_seconds=60  # Allow 60 seconds clock skew
+            )
             return decoded_token
-        except auth.InvalidIdTokenError:
-            raise Exception("Invalid ID token")
-        except auth.ExpiredIdTokenError:
-            raise Exception("Token has expired")
-        except auth.RevokedIdTokenError:
-            raise Exception("Token has been revoked")
-        except auth.CertificateFetchError:
-            raise Exception("Failed to fetch public key certificates")
+        except auth.InvalidIdTokenError as e:
+            raise Exception(f"Invalid ID token: {str(e)}")
+        except auth.ExpiredIdTokenError as e:
+            raise Exception(f"Token has expired: {str(e)}")
+        except auth.RevokedIdTokenError as e:
+            raise Exception(f"Token has been revoked: {str(e)}")
+        except auth.CertificateFetchError as e:
+            raise Exception(f"Failed to fetch public key certificates: {str(e)}")
+        except ValueError as e:
+            raise Exception(f"Token validation error: {str(e)}")
         except Exception as e:
-            raise Exception(f"Token verification failed: {e}")
+            raise Exception(f"Token verification failed: {type(e).__name__}: {str(e)}")
     
     @staticmethod
     def set_custom_user_claims(uid: str, claims: Dict[str, Any]) -> None:
@@ -260,3 +268,62 @@ class FirebaseService:
             auth.update_user(uid, disabled=False)
         except Exception as e:
             raise Exception(f"Failed to enable user: {e}")
+    
+    @staticmethod
+    def generate_password_reset_link(email: str, action_code_settings=None) -> str:
+        """
+        Generate a password reset link for a user
+        
+        Args:
+            email: User email
+            action_code_settings: Optional action code settings
+        
+        Returns:
+            Password reset link
+        """
+        try:
+            link = auth.generate_password_reset_link(email, action_code_settings)
+            return link
+        except auth.UserNotFoundError:
+            raise Exception(f"User with email {email} not found")
+        except Exception as e:
+            raise Exception(f"Failed to generate password reset link: {e}")
+    
+    @staticmethod
+    def send_password_reset_email(email: str) -> bool:
+        """
+        Send password reset email using Firebase Auth REST API
+        Firebase will send the email directly using their email templates
+        
+        Args:
+            email: User email
+        
+        Returns:
+            True if successful
+        """
+        try:
+            import requests
+            
+            # Check if Web API Key is configured
+            if not settings.FIREBASE_WEB_API_KEY:
+                raise Exception("FIREBASE_WEB_API_KEY not configured. Add it to .env file.")
+            
+            # Firebase Auth REST API endpoint
+            url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={settings.FIREBASE_WEB_API_KEY}"
+            
+            payload = {
+                "requestType": "PASSWORD_RESET",
+                "email": email
+            }
+            
+            response = requests.post(url, json=payload)
+            
+            if response.status_code == 200:
+                return True
+            else:
+                error_data = response.json()
+                error_message = error_data.get('error', {}).get('message', 'Unknown error')
+                raise Exception(f"Firebase API error: {error_message}")
+                
+        except Exception as e:
+            raise Exception(f"Failed to send password reset email: {e}")

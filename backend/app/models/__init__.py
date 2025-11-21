@@ -9,7 +9,7 @@ from app.models.user import (
 from app.models.role import Role
 from app.models.user_role import UserRole
 from app.models.academic import (
-    Semester, Course, CourseSection, Schedule, Enrollment, Assignment, Grade, Attendance,
+    Semester, Course, CourseSection, SectionSchedule, Enrollment, Assignment, Grade, Attendance,
     SemesterType, CourseLevel, SectionStatus, EnrollmentStatus, AttendanceStatus,
     AssignmentType, GradeStatus
 )
@@ -23,9 +23,11 @@ from app.models.document import (
     DeliveryMethod, AnnouncementCategory, Priority
 )
 from app.models.communication import (
-    ChatRoom, ChatParticipant, SupportTicket, TicketEvent,
-    RoomType, ParticipantRole, TicketCategory, TicketPriority, TicketStatus, EventType
+    ChatRoom, ChatParticipant, SupportTicket, TicketEvent, Notification,
+    RoomType, ParticipantRole, TicketCategory, TicketPriority, TicketStatus, EventType,
+    NotificationType, NotificationPriority
 )
+from app.models.settings import SystemSetting
 
 __all__ = [
     # Base
@@ -39,7 +41,7 @@ __all__ = [
     "Role", "UserRole",
     
     # Academic models
-    "Semester", "Course", "CourseSection", "Schedule", "Enrollment", "Assignment", "Grade", "Attendance",
+    "Semester", "Course", "CourseSection", "SectionSchedule", "Enrollment", "Assignment", "Grade", "Attendance",
     "SemesterType", "CourseLevel", "SectionStatus", "EnrollmentStatus", "AttendanceStatus",
     "AssignmentType", "GradeStatus",
     
@@ -53,6 +55,10 @@ __all__ = [
     "DeliveryMethod", "AnnouncementCategory", "Priority",
     
     # Communication models
-    "ChatRoom", "ChatParticipant", "SupportTicket", "TicketEvent",
+    "ChatRoom", "ChatParticipant", "SupportTicket", "TicketEvent", "Notification",
     "RoomType", "ParticipantRole", "TicketCategory", "TicketPriority", "TicketStatus", "EventType",
+    "NotificationType", "NotificationPriority",
+    
+    # Settings
+    "SystemSetting",
 ]

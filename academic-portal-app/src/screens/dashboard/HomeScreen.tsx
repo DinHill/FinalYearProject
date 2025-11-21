@@ -1,11 +1,58 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../constants/theme';
+import { useNavigation } from '@react-navigation/native';
+import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS, wp, hp } from '../../constants/theme';
+import { commonStyles } from '../../styles/commonStyles';
 import Card from '../../components/common/Card';
+import { api, StudentDashboardStats, UpcomingClass } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useResponsive } from '../../hooks/useResponsive';
+import { adaptiveFontSize, adaptiveSpacing } from '../../utils/responsive';
 
 const HomeScreen = () => {
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  const responsive = useResponsive();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<StudentDashboardStats | null>(null);
+  const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Only load student dashboard for students
+      if (user?.role === 'student') {
+        // Load dashboard stats
+        const dashboardResponse = await api.getStudentDashboard();
+        if (!dashboardResponse.success) {
+          throw new Error(dashboardResponse.error || 'Failed to load dashboard');
+        }
+        setDashboardData(dashboardResponse.data!);
+
+        // Load upcoming classes (next 1 day for "Today")
+        const classesResponse = await api.getUpcomingClasses(1);
+        if (classesResponse.success && classesResponse.data) {
+          setUpcomingClasses(classesResponse.data);
+        }
+      }
+      // For teachers, we don't load student-specific data
+      // Teacher dashboard would go here if implemented
+    } catch (err: any) {
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -13,131 +60,221 @@ const HomeScreen = () => {
     return 'Good evening';
   };
 
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':');
+    return `${hours}:${minutes}`;
+  };
+
+  const getDayName = (dayNum: number) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayNum];
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={commonStyles.container}>
+        <View style={commonStyles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={commonStyles.loadingText}>Loading dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={commonStyles.container}>
+        <View style={commonStyles.errorContainer}>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={COLORS.error} />
+          <Text style={commonStyles.errorText}>{error}</Text>
+          <TouchableOpacity style={commonStyles.primaryButton} onPress={loadDashboardData}>
+            <Text style={commonStyles.buttonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={commonStyles.container} edges={['bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={commonStyles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
-              <MaterialCommunityIcons name="school" size={24} color={COLORS.secondary} />
+              <Image source={require('../../../assets/images/public/Gw_Logo_Small.jpg')} style={styles.logoImage} />
             </View>
             <Text style={styles.universityName}>University of Greenwich</Text>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.notificationButton}>
+          <View style={commonStyles.headerActions}>
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('More', { screen: 'Announcements' })}
+            >
               <MaterialCommunityIcons name="bell" size={24} color={COLORS.white} />
               <View style={styles.notificationDot} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.profileButton}>
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => navigation.navigate('More', { screen: 'Profile' })}
+            >
               <MaterialCommunityIcons name="account" size={24} color={COLORS.white} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Greeting */}
-        <View style={styles.greetingContainer}>
-          <Text style={styles.greeting}>{getGreeting()}, Student!</Text>
-        </View>
-
-        {/* Academic Overview Cards */}
-        <View style={styles.overviewContainer}>
-          <Card style={styles.overviewCard}>
-            <View style={styles.overviewContent}>
-              <MaterialCommunityIcons name="target" size={24} color={COLORS.primary} />
-              <Text style={styles.overviewNumber}>4.2</Text>
-              <Text style={styles.overviewLabel}>Current GPA</Text>
-              <View style={styles.overviewChange}>
-                <Text style={styles.overviewChangeText}>+0.2</Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.overviewCard}>
-            <View style={styles.overviewContent}>
-              <MaterialCommunityIcons name="waveform" size={24} color={COLORS.secondary} />
-              <Text style={styles.overviewNumber}>92%</Text>
-              <Text style={styles.overviewLabel}>Attendance</Text>
-              <View style={styles.overviewChange}>
-                <Text style={styles.overviewChangeText}>+3%</Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.overviewCard}>
-            <View style={styles.overviewContent}>
-              <MaterialCommunityIcons name="account-group" size={24} color={COLORS.accent} />
-              <Text style={styles.overviewNumber}>18/20</Text>
-              <Text style={styles.overviewLabel}>Credits</Text>
-              <View style={styles.overviewChange}>
-                <Text style={styles.overviewChangeText}>On track</Text>
-              </View>
-            </View>
-          </Card>
+        <View style={[styles.greetingContainer, { 
+          paddingHorizontal: adaptiveSpacing.base,
+          paddingVertical: adaptiveSpacing.lg 
+        }]}>
+          <Text style={[commonStyles.greeting, { fontSize: responsive.isTablet ? adaptiveFontSize.title : adaptiveFontSize.xxlarge }]}>
+            {getGreeting()}, {user?.full_name || 'Student'}!
+          </Text>
         </View>
 
         {/* Today's Schedule */}
-        <Card style={styles.scheduleCard}>
-          <View style={styles.scheduleHeader}>
-            <Text style={styles.scheduleTitle}>Today's Schedule</Text>
-            <TouchableOpacity>
-              <Text style={styles.viewAllText}>View All ></Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.scheduleItem}>
-            <View style={[styles.scheduleLine, { backgroundColor: COLORS.primary }]} />
-            <View style={styles.scheduleContent}>
-              <Text style={styles.scheduleSubject}>Mathematics</Text>
-              <Text style={styles.scheduleLocation}>Room 101</Text>
+        <Card style={{
+          ...styles.scheduleCard,
+          marginHorizontal: adaptiveSpacing.base,
+          marginBottom: adaptiveSpacing.lg,
+          ...(responsive.isTablet && { width: responsive.wp(94) })
+        }}>
+          <View>
+            <View style={styles.scheduleHeader}>
+              <Text style={[commonStyles.sectionTitle, { fontSize: adaptiveFontSize.large }]}>Today's Schedule</Text>
+              <TouchableOpacity>
+                <Text style={[styles.viewAllText, { fontSize: adaptiveFontSize.small }]}>View All {'>'}</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.scheduleTime}>
-              <Text style={styles.timeText}>09:00</Text>
-            </View>
-          </View>
-
-          <View style={styles.scheduleItem}>
-            <View style={[styles.scheduleLine, { backgroundColor: COLORS.secondary }]} />
-            <View style={styles.scheduleContent}>
-              <Text style={styles.scheduleSubject}>Computer Science</Text>
-              <Text style={styles.scheduleLocation}>Lab 205</Text>
-            </View>
-            <View style={styles.scheduleTime}>
-              <Text style={styles.timeText}>14:00</Text>
-            </View>
+            
+            {upcomingClasses.length === 0 ? (
+              <View style={commonStyles.emptyState}>
+                <MaterialCommunityIcons name="calendar-blank" size={48} color={COLORS.gray} />
+                <Text style={commonStyles.emptyStateText}>No classes today</Text>
+              </View>
+            ) : (
+              upcomingClasses.map((classItem, index) => {
+                const colors = [COLORS.primary, COLORS.secondary, COLORS.accent, COLORS.info];
+                const color = colors[index % colors.length];
+                
+                return (
+                  <View key={`schedule-${classItem.schedule_id}-${index}`} style={commonStyles.listItemWithLine}>
+                    <View style={[commonStyles.itemLine, { backgroundColor: color }]} />
+                    <View style={commonStyles.itemContent}>
+                      <Text style={commonStyles.itemTitle}>{classItem.course_name}</Text>
+                      <Text style={commonStyles.itemSubtitle}>
+                        {classItem.room_name || 'Room TBA'} • {classItem.section_code}
+                      </Text>
+                    </View>
+                    <View style={styles.scheduleTime}>
+                      <Text style={styles.timeText}>{formatTime(classItem.start_time)}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
         </Card>
 
         {/* Quick Actions */}
-        <Card style={styles.quickActionsCard}>
-          <Text style={styles.quickActionsTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickActionItem}>
-              <MaterialCommunityIcons name="calendar" size={32} color={COLORS.secondary} />
-              <Text style={styles.quickActionTitle}>My Timetable</Text>
-              <Text style={styles.quickActionSubtitle}>View today's classes</Text>
-            </TouchableOpacity>
+        <Card style={{
+          ...styles.quickActionsCard,
+          marginHorizontal: adaptiveSpacing.base,
+          marginBottom: adaptiveSpacing.base,
+          paddingVertical: adaptiveSpacing.base
+        }}>
+          <View>
+            <Text style={[commonStyles.sectionTitle, { fontSize: adaptiveFontSize.large, marginBottom: adaptiveSpacing.base }]}>Quick Actions</Text>
+            <View style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              gap: adaptiveSpacing.sm
+            }}>
+                <TouchableOpacity 
+                  style={[commonStyles.quickActionItem, {
+                    width: '48%',
+                    padding: adaptiveSpacing.base
+                  }]}
+                  onPress={() => navigation.navigate('Schedule')}
+                >
+                  <MaterialCommunityIcons name="calendar" size={32} color={COLORS.secondary} />
+                  <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>My Timetable</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
-              <MaterialCommunityIcons name="school" size={32} color={COLORS.primary} />
-              <Text style={styles.quickActionTitle}>Grades</Text>
-              <Text style={styles.quickActionSubtitle}>Check your results</Text>
-            </TouchableOpacity>
+                {user?.role === 'teacher' ? (
+                  <>
+                    <TouchableOpacity 
+                      style={[commonStyles.quickActionItem, {
+                        width: '48%',
+                        padding: adaptiveSpacing.base
+                      }]}
+                      onPress={() => navigation.navigate('Attendance')}
+                    >
+                      <MaterialCommunityIcons name="clipboard-check" size={32} color={COLORS.primary} />
+                      <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>Attendance</Text>
+                    </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
-              <MaterialCommunityIcons name="currency-usd" size={32} color={COLORS.accent} />
-              <Text style={styles.quickActionTitle}>Tuition Fees</Text>
-              <Text style={styles.quickActionSubtitle}>Payment status</Text>
-              <View style={styles.dueSoonTag}>
-                <Text style={styles.dueSoonText}>Due Soon</Text>
-              </View>
-            </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[commonStyles.quickActionItem, {
+                        width: '48%',
+                        padding: adaptiveSpacing.base
+                      }]}
+                      onPress={() => navigation.navigate('Grades')}
+                    >
+                      <MaterialCommunityIcons name="pencil-box" size={32} color={COLORS.accent} />
+                      <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>Grades</Text>
+                    </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
-              <MaterialCommunityIcons name="file-document" size={32} color={COLORS.info} />
-              <Text style={styles.quickActionTitle}>Documents</Text>
-              <Text style={styles.quickActionSubtitle}>Request transcripts</Text>
-            </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[commonStyles.quickActionItem, {
+                        width: '48%',
+                        padding: adaptiveSpacing.base
+                      }]}
+                      onPress={() => navigation.navigate('More', { screen: 'Support' })}
+                    >
+                      <MaterialCommunityIcons name="help-circle" size={32} color={COLORS.info} />
+                      <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>Support</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity 
+                      style={[commonStyles.quickActionItem, {
+                        width: '48%',
+                        padding: adaptiveSpacing.base
+                      }]}
+                      onPress={() => navigation.navigate('Academic')}
+                    >
+                      <MaterialCommunityIcons name="school" size={32} color={COLORS.primary} />
+                      <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>Academic</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[commonStyles.quickActionItem, {
+                        width: '48%',
+                        padding: adaptiveSpacing.base
+                      }]}
+                      onPress={() => navigation.navigate('More', { screen: 'Support' })}
+                    >
+                      <MaterialCommunityIcons name="help-circle" size={32} color={COLORS.info} />
+                      <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>Support</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[commonStyles.quickActionItem, {
+                        width: '48%',
+                        padding: adaptiveSpacing.base
+                      }]}
+                      onPress={() => navigation.navigate('More', { screen: 'Finance' })}
+                    >
+                      <MaterialCommunityIcons name="currency-usd" size={32} color={COLORS.accent} />
+                      <Text style={[commonStyles.quickActionTitle, { fontSize: adaptiveFontSize.base, marginTop: adaptiveSpacing.sm }]}>Fee</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+            </View>
           </View>
         </Card>
       </ScrollView>
@@ -146,18 +283,7 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    backgroundColor: COLORS.header,
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.base,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  // Screen-specific styles only - many responsive values applied inline
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,15 +296,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.sm,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: 40,
+    height: 40,
+    resizeMode: 'contain',
   },
   universityName: {
     color: COLORS.white,
     fontSize: FONTS.sm,
     fontWeight: FONTS.medium as any,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   notificationButton: {
     marginRight: SPACING.base,
@@ -197,59 +325,24 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   greetingContainer: {
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.lg,
-  },
-  greeting: {
-    fontSize: FONTS['2xl'],
-    fontWeight: FONTS.bold as any,
-    color: COLORS.white,
-    backgroundColor: COLORS.header,
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.base,
-    alignSelf: 'flex-start',
-  },
-  overviewContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.base,
-    marginBottom: SPACING.lg,
-  },
-  overviewCard: {
-    flex: 1,
-    marginHorizontal: SPACING.xs,
-    alignItems: 'center',
-    padding: SPACING.base,
+    // Responsive spacing applied inline
   },
   overviewContent: {
     alignItems: 'center',
   },
   overviewNumber: {
-    fontSize: FONTS['3xl'],
+    // Responsive fontSize applied inline
     fontWeight: FONTS.bold as any,
     color: COLORS.primary,
     marginTop: SPACING.xs,
   },
   overviewLabel: {
-    fontSize: FONTS.sm,
+    // Responsive fontSize applied inline
     color: COLORS.gray,
     marginTop: SPACING.xs,
   },
-  overviewChange: {
-    backgroundColor: COLORS.success,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
-    marginTop: SPACING.xs,
-  },
-  overviewChangeText: {
-    color: COLORS.white,
-    fontSize: FONTS.xs,
-    fontWeight: FONTS.medium as any,
-  },
   scheduleCard: {
-    marginHorizontal: SPACING.base,
-    marginBottom: SPACING.lg,
+    // Responsive margins and width applied inline
   },
   scheduleHeader: {
     flexDirection: 'row',
@@ -257,39 +350,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.base,
   },
-  scheduleTitle: {
-    fontSize: FONTS.lg,
-    fontWeight: FONTS.semibold as any,
-    color: COLORS.black,
-  },
   viewAllText: {
     color: COLORS.primary,
-    fontSize: FONTS.sm,
+    // Responsive fontSize applied inline
     fontWeight: FONTS.medium as any,
-  },
-  scheduleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.base,
-  },
-  scheduleLine: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
-    marginRight: SPACING.base,
-  },
-  scheduleContent: {
-    flex: 1,
-  },
-  scheduleSubject: {
-    fontSize: FONTS.base,
-    fontWeight: FONTS.semibold as any,
-    color: COLORS.black,
-  },
-  scheduleLocation: {
-    fontSize: FONTS.sm,
-    color: COLORS.gray,
-    marginTop: 2,
   },
   scheduleTime: {
     backgroundColor: COLORS.grayLight,
@@ -306,51 +370,20 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.base,
     marginBottom: SPACING.xl,
   },
-  quickActionsTitle: {
-    fontSize: FONTS.lg,
-    fontWeight: FONTS.semibold as any,
-    color: COLORS.black,
-    marginBottom: SPACING.base,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickActionItem: {
-    width: '48%',
-    backgroundColor: COLORS.grayLight,
-    borderRadius: BORDER_RADIUS.base,
-    padding: SPACING.base,
-    alignItems: 'center',
-    marginBottom: SPACING.base,
+  quickActionItemRelative: {
     position: 'relative',
-  },
-  quickActionTitle: {
-    fontSize: FONTS.sm,
-    fontWeight: FONTS.semibold as any,
-    color: COLORS.black,
-    marginTop: SPACING.sm,
-    textAlign: 'center',
-  },
-  quickActionSubtitle: {
-    fontSize: FONTS.xs,
-    color: COLORS.gray,
-    marginTop: SPACING.xs,
-    textAlign: 'center',
   },
   dueSoonTag: {
     position: 'absolute',
     top: SPACING.xs,
     right: SPACING.xs,
     backgroundColor: COLORS.error,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 2,
+    // Responsive padding applied inline
     borderRadius: BORDER_RADIUS.sm,
   },
   dueSoonText: {
     color: COLORS.white,
-    fontSize: FONTS.xs,
+    // Responsive fontSize applied inline
     fontWeight: FONTS.medium as any,
   },
 });

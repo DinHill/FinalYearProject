@@ -4,7 +4,7 @@ Enrollment service - prerequisite checking, capacity validation, schedule confli
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from app.models import (
-    User, CourseSection, Course, Enrollment, Schedule, Semester
+    User, CourseSection, Course, Enrollment, Semester  # Removed Schedule
 )
 from app.core.exceptions import (
     ValidationError,
@@ -61,8 +61,8 @@ class EnrollmentService:
         if not section:
             raise ValidationError("Course section not found")
         
-        if section.status != "open":
-            raise ValidationError(f"Section is {section.status}")
+        if not section.is_active:
+            raise ValidationError(f"Section is not active")
         
         # Check capacity
         enrolled_count = await EnrollmentService.get_enrolled_count(db, section_id)
@@ -76,7 +76,7 @@ class EnrollmentService:
             select(Enrollment).where(
                 and_(
                     Enrollment.student_id == student_id,
-                    Enrollment.section_id == section_id,
+                    Enrollment.course_section_id == section_id,
                     Enrollment.status == "enrolled"
                 )
             )
@@ -122,12 +122,18 @@ class EnrollmentService:
         # Create enrollment
         enrollment = Enrollment(
             student_id=student_id,
-            section_id=section_id,
+            course_section_id=section_id,
             status="enrolled",
-            enrolled_at=datetime.utcnow()
+            enrollment_date=datetime.utcnow()
         )
         
         db.add(enrollment)
+        
+        # Update section enrolled_count
+        section = await db.get(CourseSection, section_id)
+        if section:
+            section.enrolled_count = (section.enrolled_count or 0) + 1
+        
         await db.commit()
         await db.refresh(enrollment)
         
@@ -185,7 +191,7 @@ class EnrollmentService:
         result = await db.execute(
             select(func.count()).select_from(Enrollment).where(
                 and_(
-                    Enrollment.section_id == section_id,
+                    Enrollment.course_section_id == section_id,
                     Enrollment.status == "enrolled"
                 )
             )
@@ -201,6 +207,9 @@ class EnrollmentService:
         """
         Check if new section conflicts with student's existing schedule
         
+        Note: Schedules are stored as JSONB in course_sections.schedule column
+        Format: [{"day": "Monday", "start_time": "09:00", "end_time": "10:30", "room": "A101"}, ...]
+        
         Args:
             db: Database session
             student_id: Student user ID
@@ -209,13 +218,13 @@ class EnrollmentService:
         Returns:
             True if conflict exists, False otherwise
         """
-        # Get new section's schedules
-        new_schedules_result = await db.execute(
-            select(Schedule).where(Schedule.section_id == new_section_id)
+        # Get new section with schedules
+        new_section_result = await db.execute(
+            select(CourseSection).where(CourseSection.id == new_section_id)
         )
-        new_schedules = new_schedules_result.scalars().all()
+        new_section = new_section_result.scalar_one_or_none()
         
-        if not new_schedules:
+        if not new_section or not new_section.schedule:
             return False  # No schedule defined, no conflict
         
         # Get student's current enrollments
@@ -232,25 +241,42 @@ class EnrollmentService:
         if not enrollments:
             return False  # No existing enrollments, no conflict
         
-        # Get schedules for all enrolled sections
-        section_ids = [e.section_id for e in enrollments]
-        existing_schedules_result = await db.execute(
-            select(Schedule).where(Schedule.section_id.in_(section_ids))
+        # Get course sections for all enrolled sections
+        section_ids = [e.course_section_id for e in enrollments]
+        existing_sections_result = await db.execute(
+            select(CourseSection).where(CourseSection.id.in_(section_ids))
         )
-        existing_schedules = existing_schedules_result.scalars().all()
+        existing_sections = existing_sections_result.scalars().all()
         
         # Check for time conflicts
+        new_schedules = new_section.schedule if isinstance(new_section.schedule, list) else []
+        
         for new_sched in new_schedules:
-            for existing_sched in existing_schedules:
-                # Same day?
-                if new_sched.day_of_week != existing_sched.day_of_week:
+            for existing_section in existing_sections:
+                if not existing_section.schedule:
                     continue
+                    
+                existing_schedules = existing_section.schedule if isinstance(existing_section.schedule, list) else []
                 
-                # Time overlap?
-                # Conflict if: new_start < existing_end AND new_end > existing_start
-                if (new_sched.start_time < existing_sched.end_time and
-                    new_sched.end_time > existing_sched.start_time):
-                    return True
+                for existing_sched in existing_schedules:
+                    # Same day?
+                    if new_sched.get('day') != existing_sched.get('day'):
+                        continue
+                    
+                    # Time overlap?
+                    # Conflict if: new_start < existing_end AND new_end > existing_start
+                    try:
+                        new_start = new_sched.get('start_time', '')
+                        new_end = new_sched.get('end_time', '')
+                        existing_start = existing_sched.get('start_time', '')
+                        existing_end = existing_sched.get('end_time', '')
+                        
+                        if (new_start and new_end and existing_start and existing_end):
+                            if (new_start < existing_end and new_end > existing_start):
+                                return True
+                    except (AttributeError, TypeError):
+                        # Invalid schedule format, skip
+                        continue
         
         return False
     
@@ -306,7 +332,7 @@ class EnrollmentService:
         Returns:
             List of enrollments
         """
-        query = select(Enrollment).where(Enrollment.section_id == section_id)
+        query = select(Enrollment).where(Enrollment.course_section_id == section_id)
         
         if status:
             query = query.where(Enrollment.status == status)

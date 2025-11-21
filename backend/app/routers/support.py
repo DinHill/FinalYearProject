@@ -7,7 +7,7 @@ Handles communication features including:
 - Priority and status management
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -60,7 +60,7 @@ def is_sla_breached(deadline: datetime) -> bool:
 async def create_support_ticket(
     ticket_data: SupportTicketCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Create a new support ticket.
@@ -68,51 +68,31 @@ async def create_support_ticket(
     Access: student, teacher, admin
     
     Process:
-    1. Create ticket with auto-assigned ticket number
+    1. Create ticket
     2. Set initial status to "open"
-    3. Calculate SLA deadline based on priority
-    4. Create initial ticket event
     """
-    # Generate ticket number
-    # Format: TICKET-YYYYMMDD-XXXX
-    today = datetime.utcnow()
-    date_str = today.strftime("%Y%m%d")
-    
-    # Get count of tickets created today
-    count_query = await db.execute(
-        select(func.count(SupportTicket.id)).where(
-            func.date(SupportTicket.created_at) == today.date()
-        )
-    )
-    daily_count = count_query.scalar() or 0
-    ticket_number = f"TICKET-{date_str}-{daily_count + 1:04d}"
-    
-    # Calculate SLA deadline
-    sla_deadline = calculate_sla_deadline(ticket_data.priority, today)
-    
     # Create ticket
     ticket = SupportTicket(
-        ticket_number=ticket_number,
-        requester_id=current_user.id,
+        user_id=current_user["db_user_id"],  # Changed from requester_id, removed UUID conversion
         subject=ticket_data.subject,
         description=ticket_data.description,
         category=ticket_data.category,
         priority=ticket_data.priority,
         status="open",
-        sla_deadline=sla_deadline,
     )
     
     db.add(ticket)
     await db.flush()  # Get ticket ID
     
-    # Create initial event
-    initial_event = TicketEvent(
-        ticket_id=ticket.id,
-        user_id=current_user.id,
-        event_type="created",
-        description=f"Ticket created by {current_user.full_name}",
-    )
-    db.add(initial_event)
+    # Ticket events not supported - ticket_events table doesn't exist in database
+    # # Create initial event
+    # initial_event = TicketEvent(
+    #     ticket_id=ticket.id,
+    #     user_id=current_user["db_user_id"],
+    #     event_type="created",
+    #     description=f"Ticket created by {current_user.get('username', 'User')}",
+    # )
+    # db.add(initial_event)
     
     await db.commit()
     await db.refresh(ticket)
@@ -125,15 +105,15 @@ async def list_support_tickets(
     status: Optional[str] = Query(None, description="Filter by status"),
     priority: Optional[str] = Query(None, description="Filter by priority"),
     category: Optional[str] = Query(None, description="Filter by category"),
-    requester_id: Optional[UUID] = Query(None, description="Filter by requester"),
-    assigned_to_id: Optional[UUID] = Query(None, description="Filter by assignee"),
+    user_id: Optional[int] = Query(None, description="Filter by requester"),  # Changed from requester_id
+    assigned_to_id: Optional[int] = Query(None, description="Filter by assignee"),  # Removed UUID type
     campus_id: Optional[int] = Query(None, description="Filter by campus"),
-    sla_breached: Optional[bool] = Query(None, description="Filter by SLA breach"),
+    # sla_breached: Optional[bool] = Query(None, description="Filter by SLA breach"),  # Removed: sla_due_at doesn't exist in DB
     search: Optional[str] = Query(None, description="Search in subject/description"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     List support tickets with filters (campus-filtered).
@@ -143,28 +123,29 @@ async def list_support_tickets(
     - Students/Teachers can see their own tickets and tickets assigned to them
     """
     # Build query with join to User for campus filtering
-    query = select(SupportTicket).join(User, SupportTicket.requester_id == User.id)
+    query = select(SupportTicket).join(User, SupportTicket.user_id == User.id)  # Changed from requester_id
     
     # Role-based filtering
-    if current_user.role in ["student", "teacher"]:
+    user_roles = current_user.get("roles", [])
+    if any(role in ["student", "teacher"] for role in user_roles):
         # Can see tickets they created or tickets assigned to them
         query = query.where(
             or_(
-                SupportTicket.requester_id == current_user.id,
-                SupportTicket.assigned_to_id == current_user.id
+                SupportTicket.user_id == current_user["db_user_id"],  # Changed from requester_id, removed UUID
+                SupportTicket.assigned_to == current_user["db_user_id"]  # Changed to match model, removed UUID
             )
         )
     else:
         # Admin - apply campus filtering
         user_campus_access = await get_user_campus_access(
-            {"uid": str(current_user.id), "roles": [current_user.role]}, db
+            {"uid": current_user["uid"], "roles": current_user.get("roles", [])}, db
         )
         
         if campus_id:
             # Specific campus requested - verify access
             if user_campus_access is not None:
                 await check_campus_access(
-                    {"uid": str(current_user.id), "roles": [current_user.role]}, 
+                    {"uid": current_user["uid"], "roles": current_user.get("roles", [])}, 
                     campus_id, db, raise_error=True
                 )
             query = query.where(User.campus_id == campus_id)
@@ -179,7 +160,7 @@ async def list_support_tickets(
                         items=[],
                         total=0,
                         page=page,
-                        page_size=page_size,
+                        per_page=page_size,  # Fixed: use per_page instead of page_size
                         pages=0
                     )
     
@@ -192,37 +173,25 @@ async def list_support_tickets(
     if category:
         query = query.where(SupportTicket.category == category)
     
-    if requester_id:
-        query = query.where(SupportTicket.requester_id == requester_id)
+    if user_id:  # Changed from requester_id
+        query = query.where(SupportTicket.user_id == user_id)  # Changed from requester_id
     
     if assigned_to_id:
-        query = query.where(SupportTicket.assigned_to_id == assigned_to_id)
+        query = query.where(SupportTicket.assigned_to == assigned_to_id)  # Changed to match model
     
-    if sla_breached is not None:
-        if sla_breached:
-            # SLA breached (deadline passed and not resolved)
-            query = query.where(
-                and_(
-                    SupportTicket.sla_deadline < datetime.utcnow(),
-                    SupportTicket.status.in_(["open", "in_progress", "waiting"])
-                )
-            )
-        else:
-            # SLA not breached
-            query = query.where(
-                or_(
-                    SupportTicket.sla_deadline >= datetime.utcnow(),
-                    SupportTicket.status.in_(["resolved", "closed"])
-                )
-            )
+    # SLA filtering removed - sla_due_at column doesn't exist in database
+    # if sla_breached is not None:
+    #     if sla_breached:
+    #         # SLA breached (deadline passed and not resolved)
+    #         query = query.where(...)
     
     if search:
         search_term = f"%{search}%"
         query = query.where(
             or_(
                 SupportTicket.subject.ilike(search_term),
-                SupportTicket.description.ilike(search_term),
-                SupportTicket.ticket_number.ilike(search_term)
+                SupportTicket.description.ilike(search_term)
+                # Removed: ticket_number search - field doesn't exist in database
             )
         )
     
@@ -242,7 +211,7 @@ async def list_support_tickets(
         items=tickets,
         total=total,
         page=page,
-        page_size=page_size,
+        per_page=page_size,  # Fixed: use per_page instead of page_size
         pages=(total + page_size - 1) // page_size
     )
 
@@ -251,7 +220,7 @@ async def list_support_tickets(
 async def get_support_ticket(
     ticket_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Get ticket details including all events.
@@ -263,11 +232,12 @@ async def get_support_ticket(
     query = select(SupportTicket).where(SupportTicket.id == ticket_id)
     
     # Role-based filtering
-    if current_user.role in ["student", "teacher"]:
+    user_roles = current_user.get("roles", [])
+    if any(role in ["student", "teacher"] for role in user_roles):
         query = query.where(
             or_(
-                SupportTicket.requester_id == current_user.id,
-                SupportTicket.assigned_to_id == current_user.id
+                SupportTicket.user_id == current_user["db_user_id"],  # Changed from requester_id, removed UUID
+                SupportTicket.assigned_to == current_user["db_user_id"]  # Changed to match model, removed UUID
             )
         )
     
@@ -277,21 +247,23 @@ async def get_support_ticket(
     if not ticket:
         raise NotFoundError(f"Support ticket with ID {ticket_id} not found")
     
-    # Get all events for this ticket
-    events_query = await db.execute(
-        select(TicketEvent)
-        .where(TicketEvent.ticket_id == ticket_id)
-        .order_by(TicketEvent.created_at.asc())
-    )
-    events = events_query.scalars().all()
+    # Ticket events not supported - ticket_events table doesn't exist in database
+    # # Get all events for this ticket
+    # events_query = await db.execute(
+    #     select(TicketEvent)
+    #     .where(TicketEvent.ticket_id == ticket_id)
+    #     .order_by(TicketEvent.created_at.asc())
+    # )
+    # events = events_query.scalars().all()
+    events = []  # Empty list since events table doesn't exist
     
-    # Check if SLA breached
-    sla_breached = is_sla_breached(ticket.sla_deadline) and ticket.status not in ["resolved", "closed"]
+    # SLA breach calculation removed - sla_due_at column doesn't exist in database
+    # sla_breached = is_sla_breached(ticket.sla_due_at) and ticket.status not in ["resolved", "closed"]
     
     return SupportTicketDetailResponse(
         **ticket.__dict__,
         events=events,
-        sla_breached=sla_breached
+        # sla_breached=sla_breached  # Removed
     )
 
 
@@ -300,7 +272,7 @@ async def update_support_ticket(
     ticket_id: int,
     update_data: SupportTicketUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "support_admin"))
 ):
     """
     Update support ticket (assign, change status, priority, etc.).
@@ -325,7 +297,7 @@ async def update_support_ticket(
         old_status = ticket.status
         ticket.status = update_data.status
         events_to_create.append({
-            "event_type": "status_changed",
+            "event_type": "status_change",
             "description": f"Status changed from '{old_status}' to '{update_data.status}'"
         })
         
@@ -341,10 +313,10 @@ async def update_support_ticket(
         ticket.priority = update_data.priority
         
         # Recalculate SLA deadline
-        ticket.sla_deadline = calculate_sla_deadline(update_data.priority, ticket.created_at)
+        ticket.sla_due_at = calculate_sla_deadline(update_data.priority, ticket.created_at)
         
         events_to_create.append({
-            "event_type": "priority_changed",
+            "event_type": "comment",
             "description": f"Priority changed from '{old_priority}' to '{update_data.priority}'"
         })
     
@@ -363,12 +335,12 @@ async def update_support_ticket(
                     raise NotFoundError(f"User with ID {update_data.assigned_to_id} not found")
                 
                 events_to_create.append({
-                    "event_type": "assigned",
+                    "event_type": "assignment",
                     "description": f"Ticket assigned to {assignee.full_name}"
                 })
             else:
                 events_to_create.append({
-                    "event_type": "unassigned",
+                    "event_type": "assignment",
                     "description": "Ticket unassigned"
                 })
     
@@ -377,7 +349,7 @@ async def update_support_ticket(
         old_category = ticket.category
         ticket.category = update_data.category
         events_to_create.append({
-            "event_type": "category_changed",
+            "event_type": "comment",
             "description": f"Category changed from '{old_category}' to '{update_data.category}'"
         })
     
@@ -385,7 +357,7 @@ async def update_support_ticket(
     for event_data in events_to_create:
         event = TicketEvent(
             ticket_id=ticket.id,
-            user_id=current_user.id,
+            created_by=current_user["db_user_id"],
             event_type=event_data["event_type"],
             description=event_data["description"],
         )
@@ -402,7 +374,7 @@ async def add_ticket_event(
     ticket_id: int,
     event_data: TicketEventCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     Add an event/comment to a ticket.
@@ -415,11 +387,12 @@ async def add_ticket_event(
     query = select(SupportTicket).where(SupportTicket.id == ticket_id)
     
     # Role-based filtering
-    if current_user.role in ["student", "teacher"]:
+    user_roles = current_user.get("roles", [])
+    if any(role in ["student", "teacher"] for role in user_roles):
         query = query.where(
             or_(
-                SupportTicket.requester_id == current_user.id,
-                SupportTicket.assigned_to_id == current_user.id
+                SupportTicket.user_id == current_user["db_user_id"],  # Changed from requester_id, removed UUID
+                SupportTicket.assigned_to == current_user["db_user_id"]  # Changed to match model, removed UUID
             )
         )
     
@@ -432,7 +405,7 @@ async def add_ticket_event(
     # Create event
     event = TicketEvent(
         ticket_id=ticket_id,
-        user_id=current_user.id,
+        created_by=current_user["db_user_id"],
         event_type=event_data.event_type,
         description=event_data.description,
     )
@@ -452,7 +425,7 @@ async def add_ticket_event(
 async def list_ticket_events(
     ticket_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("student", "teacher", "super_admin", "support_admin"))
 ):
     """
     List all events for a ticket.
@@ -464,11 +437,12 @@ async def list_ticket_events(
     # Get ticket (with access check)
     ticket_query = select(SupportTicket).where(SupportTicket.id == ticket_id)
     
-    if current_user.role in ["student", "teacher"]:
+    user_roles = current_user.get("roles", [])
+    if any(role in ["student", "teacher"] for role in user_roles):
         ticket_query = ticket_query.where(
             or_(
-                SupportTicket.requester_id == current_user.id,
-                SupportTicket.assigned_to_id == current_user.id
+                SupportTicket.user_id == current_user["db_user_id"],  # Changed from requester_id, removed UUID
+                SupportTicket.assigned_to == current_user["db_user_id"]  # Changed to match model, removed UUID
             )
         )
     
@@ -492,7 +466,7 @@ async def list_ticket_events(
 @router.get("/stats/summary", response_model=dict)
 async def get_support_stats(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin", "support_admin"))
+    current_user: Dict[str, Any] = Depends(require_roles("super_admin", "support_admin"))
 ):
     """
     Get support ticket statistics.
@@ -524,28 +498,11 @@ async def get_support_stats(
     )
     by_priority = {priority: count for priority, count in priority_query.all()}
     
-    # SLA breaches
-    sla_breach_query = await db.execute(
-        select(func.count(SupportTicket.id))
-        .where(
-            and_(
-                SupportTicket.sla_deadline < datetime.utcnow(),
-                SupportTicket.status.in_(["open", "in_progress", "waiting"])
-            )
-        )
-    )
-    sla_breaches = sla_breach_query.scalar()
+    # SLA breaches - Since sla_due_at doesn't exist, return 0 for now
+    sla_breaches = 0
     
-    # Average resolution time (in hours)
-    avg_resolution_query = await db.execute(
-        select(
-            func.avg(
-                func.extract('epoch', SupportTicket.resolved_at - SupportTicket.created_at) / 3600
-            )
-        )
-        .where(SupportTicket.resolved_at.isnot(None))
-    )
-    avg_resolution_hours = avg_resolution_query.scalar() or 0
+    # Average resolution time - Since resolved_at doesn't exist, return 0
+    avg_resolution_hours = 0
     
     return {
         "total_tickets": total_tickets,

@@ -36,19 +36,20 @@ class PaginationParams(BaseModel):
 
 class PaginatedResponse(BaseModel, Generic[T]):
     """Paginated response wrapper"""
-    data: list[T]
-    pagination: dict
+    items: list[T]
+    total: int
+    page: int
+    per_page: int
+    pages: int
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "data": [],
-                "pagination": {
-                    "page": 1,
-                    "page_size": 20,
-                    "total": 100,
-                    "pages": 5
-                }
+                "items": [],
+                "total": 100,
+                "page": 1,
+                "per_page": 20,
+                "pages": 5
             }
         }
     )

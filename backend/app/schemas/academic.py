@@ -92,12 +92,12 @@ class CourseSectionBase(BaseSchema):
     """Base course section schema"""
     course_id: int = Field(..., description="Course ID")
     semester_id: int = Field(..., description="Semester ID")
-    section_number: str = Field(..., description="Section number", example="01", pattern=r"^\d{2}$")
-    instructor_id: int = Field(..., description="Instructor user ID", alias="teacher_id")
-    campus_id: int = Field(..., description="Campus ID")
+    section_code: str = Field(..., description="Section code", example="01")  # Changed from section_number to section_code
+    instructor_id: int = Field(..., description="Instructor user ID")
     max_students: int = Field(..., description="Maximum student capacity", ge=1, le=100)
     room: Optional[str] = Field(None, description="Room number", example="A101")
     status: str = Field("active", description="Section status", pattern="^(active|cancelled|completed)$")
+    # Removed campus_id - doesn't exist in database
 
 
 class CourseSectionCreate(CourseSectionBase):
@@ -119,6 +119,15 @@ class CourseSectionResponse(CourseSectionBase):
     enrolled_count: int = Field(..., description="Current enrollment count")
     created_at: datetime
     
+    # Additional fields from relationships
+    course_code: Optional[str] = None
+    course_name: Optional[str] = None
+    semester_name: Optional[str] = None
+    instructor_name: Optional[str] = None
+    
+    # Schedule field from JSONB
+    schedule: Optional[dict] = Field(None, description="Schedule data in JSONB format")
+    
     model_config = ConfigDict(
         from_attributes=True,
         populate_by_name=True  # Allow both instructor_id and teacher_id
@@ -127,39 +136,41 @@ class CourseSectionResponse(CourseSectionBase):
 
 # ============================================================================
 # Schedule Schemas
+# NOTE: Schedule model removed - CourseSection uses JSONB 'schedule' field
+# Keep these schemas for API validation if needed, or remove if not used
 # ============================================================================
 
-class ScheduleBase(BaseSchema):
-    """Base schedule schema"""
-    section_id: int = Field(..., description="Course section ID")
-    day_of_week: int = Field(..., description="Day of week (0=Monday, 6=Sunday)", ge=0, le=6)
-    start_time: time = Field(..., description="Class start time")
-    end_time: time = Field(..., description="Class end time")
-
-
-class ScheduleCreate(ScheduleBase):
-    """Create schedule request"""
-    
-    @field_validator('end_time')
-    @classmethod
-    def validate_time_range(cls, v, info):
-        """Validate end time is after start time"""
-        if 'start_time' in info.data and v <= info.data['start_time']:
-            raise ValueError("End time must be after start time")
-        return v
-
-
-class ScheduleUpdate(BaseSchema):
-    """Update schedule request"""
-    day_of_week: Optional[int] = Field(None, ge=0, le=6)
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
-
-
-class ScheduleResponse(ScheduleBase):
-    """Schedule response"""
-    id: int
-    created_at: datetime
+# class ScheduleBase(BaseSchema):
+#     """Base schedule schema"""
+#     course_section_id: int = Field(..., description="Course section ID")
+#     day_of_week: int = Field(..., description="Day of week (0=Monday, 6=Sunday)", ge=0, le=6)
+#     start_time: time = Field(..., description="Class start time")
+#     end_time: time = Field(..., description="Class end time")
+#
+#
+# class ScheduleCreate(ScheduleBase):
+#     """Create schedule request"""
+#     
+#     @field_validator('end_time')
+#     @classmethod
+#     def validate_time_range(cls, v, info):
+#         """Validate end time is after start time"""
+#         if 'start_time' in info.data and v <= info.data['start_time']:
+#             raise ValueError("End time must be after start time")
+#         return v
+#
+#
+# class ScheduleUpdate(BaseSchema):
+#     """Update schedule request"""
+#     day_of_week: Optional[int] = Field(None, ge=0, le=6)
+#     start_time: Optional[time] = None
+#     end_time: Optional[time] = None
+#
+#
+# class ScheduleResponse(ScheduleBase):
+#     """Schedule response"""
+#     id: int
+#     created_at: datetime
 
 
 # ============================================================================
@@ -168,14 +179,14 @@ class ScheduleResponse(ScheduleBase):
 
 class EnrollmentBase(BaseSchema):
     """Base enrollment schema"""
-    section_id: int = Field(..., description="Course section ID")
+    course_section_id: int = Field(..., description="Course section ID")  # Changed from section_id to course_section_id
     student_id: int = Field(..., description="Student user ID")
     status: str = Field("enrolled", description="Enrollment status", pattern="^(enrolled|dropped|withdrawn|completed)$")
 
 
 class EnrollmentCreate(BaseSchema):
     """Create enrollment request (simplified - student_id from token)"""
-    section_id: int = Field(..., description="Course section ID to enroll in")
+    course_section_id: int = Field(..., description="Course section ID to enroll in")  # Changed from section_id to course_section_id
 
 
 class EnrollmentUpdate(BaseSchema):
@@ -186,7 +197,7 @@ class EnrollmentUpdate(BaseSchema):
 class EnrollmentResponse(EnrollmentBase):
     """Enrollment response"""
     id: int
-    enrolled_at: datetime
+    enrollment_date: datetime  # Changed from enrolled_at to enrollment_date
     dropped_at: Optional[datetime] = None
     created_at: datetime
 
@@ -195,7 +206,7 @@ class EnrollmentWithCourseResponse(EnrollmentResponse):
     """Enrollment response with course details"""
     course_code: str
     course_name: str
-    section_number: str
+    section_code: str  # Changed from section_number to section_code
     teacher_name: str
     credits: int
     semester_name: str
@@ -207,7 +218,7 @@ class EnrollmentWithCourseResponse(EnrollmentResponse):
 
 class AssignmentBase(BaseSchema):
     """Base assignment schema"""
-    section_id: int = Field(..., description="Course section ID")
+    course_section_id: int = Field(..., description="Course section ID")  # Changed from section_id to course_section_id
     title: str = Field(..., description="Assignment title", max_length=200)
     description: Optional[str] = Field(None, description="Assignment description")
     due_date: datetime = Field(..., description="Due date and time")
@@ -241,15 +252,17 @@ class AssignmentResponse(AssignmentBase):
 
 class GradeBase(BaseSchema):
     """Base grade schema"""
-    assignment_id: int = Field(..., description="Assignment ID")
-    student_id: int = Field(..., description="Student user ID")
+    enrollment_id: int = Field(..., description="Enrollment ID")  # Changed from assignment_id/student_id to enrollment_id
+    assignment_name: str = Field(..., description="Assignment name", max_length=255)  # Changed from assignment_id (int) to assignment_name (str)
     score: Optional[Decimal] = Field(None, description="Score earned", ge=0)
     feedback: Optional[str] = Field(None, description="Teacher feedback")
+    # Removed student_id - not in database
 
 
 class GradeCreate(BaseSchema):
     """Create grade request"""
-    student_id: int = Field(..., description="Student user ID")
+    enrollment_id: int = Field(..., description="Enrollment ID")  # Changed from student_id to enrollment_id
+    assignment_name: str = Field(..., description="Assignment name", max_length=255)  # Changed from assignment_id (int) to assignment_name (str)
     score: Decimal = Field(..., description="Score earned", ge=0)
     feedback: Optional[str] = None
 
@@ -282,16 +295,16 @@ class GradeWithAssignmentResponse(GradeResponse):
 
 class AttendanceBase(BaseSchema):
     """Base attendance schema"""
-    section_id: int = Field(..., description="Course section ID")
-    student_id: int = Field(..., description="Student user ID")
+    enrollment_id: int = Field(..., description="Enrollment ID")  # Changed from section_id/student_id to enrollment_id
     date: date_type = Field(..., description="Attendance date")
     status: str = Field(..., description="Attendance status", pattern="^(present|absent|late|excused)$")
     notes: Optional[str] = Field(None, description="Attendance notes")
+    # Removed section_id and student_id - database uses enrollment_id only
 
 
 class AttendanceCreate(BaseSchema):
     """Create attendance record"""
-    student_id: int = Field(..., description="Student user ID")
+    student_id: int = Field(..., description="Student user ID")  # Keep student_id for input (router will convert to enrollment_id)
     status: str = Field(..., description="Attendance status", pattern="^(present|absent|late|excused)$")
     notes: Optional[str] = None
 
@@ -317,11 +330,30 @@ class AttendanceResponse(AttendanceBase):
 
 class AttendanceSummary(BaseSchema):
     """Attendance summary for a student in a section"""
-    section_id: int
-    student_id: int
+    enrollment_id: int  # Changed from section_id/student_id to enrollment_id
     total_sessions: int
     present_count: int
     absent_count: int
     late_count: int
     excused_count: int
     attendance_rate: Decimal = Field(..., description="Attendance percentage")
+    # Removed section_id and student_id
+
+
+# ============================================================================
+# Bulk Grade Schemas
+# ============================================================================
+
+class GradeEntryRecord(BaseSchema):
+    """Single grade entry for bulk submission"""
+    enrollment_id: int = Field(..., description="Enrollment ID")
+    score: str = Field(..., description="Score as string to handle decimals")
+    max_score: float = Field(..., description="Maximum possible score", ge=0)
+    assessment_type: str = Field(..., description="Type of assessment (quiz, assignment, exam, etc.)")
+    assessment_name: str = Field(..., description="Name of the assessment", max_length=255)
+
+
+class GradeBulkCreate(BaseSchema):
+    """Bulk grade submission request"""
+    section_id: int = Field(..., description="Course section ID")
+    grades: List[GradeEntryRecord] = Field(..., description="List of grade entries")

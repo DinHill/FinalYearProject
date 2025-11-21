@@ -1,212 +1,238 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Plus, BookOpen, GraduationCap, Calendar, Users, Clock, Star } from 'lucide-react';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  GraduationCap, 
+  BookOpen, 
+  Calendar, 
+  ClipboardCheck, 
+  FileCheck,
+  Users,
+  FileText,
+  Plus
+} from 'lucide-react';
+import { api } from '@/lib/api';
+import { UnifiedCourseViewEnhanced } from '@/components/academics/UnifiedCourseViewEnhanced';
+import { TimetableTab } from '@/components/academics/TimetableTab';
+import { AttendanceTab } from '@/components/academics/AttendanceTab';
+import { GradesTab } from '@/components/academics/GradesTab';
+import { MaterialsCourseView } from '@/components/academics/MaterialsCourseView';
 
 export default function AcademicsPage() {
-  const mockCourses = [
-    {
-      id: 1,
-      title: 'Introduction to Computer Science',
-      code: 'CS101',
-      instructor: 'Dr. Jane Smith',
-      students: 45,
-      duration: '16 weeks',
-      status: 'Active',
-      rating: 4.8
-    },
-    {
-      id: 2,
-      title: 'Advanced Machine Learning',
-      code: 'CS401',
-      instructor: 'Prof. Michael Johnson',
-      students: 28,
-      duration: '12 weeks',
-      status: 'Active',
-      rating: 4.9
-    },
-    {
-      id: 3,
-      title: 'Digital Marketing Strategy',
-      code: 'MKT301',
-      instructor: 'Dr. Sarah Wilson',
-      students: 35,
-      duration: '14 weeks',
-      status: 'Upcoming',
-      rating: 4.7
-    }
-  ];
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('curriculum');
+  const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  // Fetch semesters
+  const { data: semesters = [] } = useQuery({
+    queryKey: ['semesters'],
+    queryFn: async () => {
+      const response = await api.get<any[]>('/api/v1/academic/semesters');
+      if (!response.success) throw new Error(response.error);
+      return response.data || [];
     }
-  };
+  });
+
+  // Fetch current semester
+  const { data: currentSemester } = useQuery({
+    queryKey: ['current-semester'],
+    queryFn: async () => {
+      const response = await api.get<any>('/api/v1/academic/semesters/current');
+      if (!response.success) throw new Error(response.error);
+      return response.data;
+    }
+  });
+
+  // Set selected semester to current on load
+  useEffect(() => {
+    if (!selectedSemester && currentSemester?.id) {
+      setSelectedSemester(currentSemester.id);
+    }
+  }, [currentSemester, selectedSemester]);
+
+  // Fetch academic dashboard stats
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['academic-dashboard-stats', selectedSemester],
+    queryFn: async () => {
+      const response = await api.get<any>('/api/v1/academic/dashboard/stats', {
+        params: { semester_id: selectedSemester }
+      });
+      if (!response.success) throw new Error(response.error);
+      return response.data;
+    },
+    enabled: !!selectedSemester
+  });
+
+
 
   return (
     <AdminLayout>
-      <PageHeader 
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Calendar className="w-4 h-4 mr-2" />
-              Schedule
-            </Button>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Course
-            </Button>
-          </div>
-        }
-      />
-
       <div className="p-6 space-y-6">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <BookOpen className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Courses</p>
-                  <p className="text-2xl font-bold">64</p>
-                  <p className="text-xs text-green-600">+3 this semester</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Users className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Enrolled Students</p>
-                  <p className="text-2xl font-bold">1,247</p>
-                  <p className="text-xs text-green-600">+12% increase</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Faculty</p>
-                  <p className="text-2xl font-bold">89</p>
-                  <p className="text-xs text-blue-600">+2 new hires</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <Star className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Avg Rating</p>
-                  <p className="text-2xl font-bold">4.8</p>
-                  <p className="text-xs text-green-600">+0.2 this term</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Page Header with Semester Selector */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-[#003366]">Academic Management</h1>
+            <p className="text-gray-500 mt-1">
+              Manage programs, courses, timetable, attendance, and grades
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/semesters/new')}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Semester
+            </Button>
+            <Select 
+              value={selectedSemester?.toString() || ''} 
+              onValueChange={(value) => setSelectedSemester(parseInt(value))}
+            >
+              <SelectTrigger className="w-[250px]">
+                <SelectValue placeholder="Select semester" />
+              </SelectTrigger>
+              <SelectContent>
+                {semesters.map((semester: any) => (
+                  <SelectItem key={semester.id} value={semester.id.toString()}>
+                    {semester.name} {semester.is_active && '(Current)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Course Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Course Management</CardTitle>
-            <CardDescription>
-              Manage active courses, schedules, and enrollment
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockCourses.map((course) => (
-                <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                      <BookOpen className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{course.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {course.code} • Instructor: {course.instructor}
-                      </p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Users className="w-3 h-3" />
-                          {course.students} students
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Clock className="w-3 h-3" />
-                          {course.duration}
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          {course.rating}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge className={getStatusColor(course.status)}>
-                      {course.status}
-                    </Badge>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">Edit</Button>
-                      <Button variant="ghost" size="sm">View</Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Dashboard Stats Cards */}
+        {dashboardStats && (
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Programs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{dashboardStats.total_programs || 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Courses
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{dashboardStats.total_courses || 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Students
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{dashboardStats.active_students || 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Instructors
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{dashboardStats.active_instructors || 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4" />
+                  Attendance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{dashboardStats.attendance_compliance?.toFixed(1) || 0}%</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <FileCheck className="h-4 w-4" />
+                  Grade Approval
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{dashboardStats.grade_approval_rate?.toFixed(1) || 0}%</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="p-6 text-center">
-              <BookOpen className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="font-semibold mb-2">Course Catalog</h3>
-              <p className="text-sm text-muted-foreground">Browse and manage course offerings</p>
-            </CardContent>
-          </Card>
+        {/* Tabbed Interface */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="curriculum" className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4" />
+              Curriculum
+            </TabsTrigger>
+            <TabsTrigger value="materials" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Materials
+            </TabsTrigger>
+            <TabsTrigger value="timetable" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Timetable
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              Attendance
+            </TabsTrigger>
+            <TabsTrigger value="grades" className="flex items-center gap-2">
+              <FileCheck className="h-4 w-4" />
+              Grades
+            </TabsTrigger>
+          </TabsList>
 
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="p-6 text-center">
-              <Calendar className="w-12 h-12 text-green-600 mx-auto mb-4" />
-              <h3 className="font-semibold mb-2">Academic Calendar</h3>
-              <p className="text-sm text-muted-foreground">View semester dates and deadlines</p>
-            </CardContent>
-          </Card>
+          <TabsContent value="curriculum">
+            <UnifiedCourseViewEnhanced semesterId={selectedSemester} />
+          </TabsContent>
 
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="p-6 text-center">
-              <GraduationCap className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-              <h3 className="font-semibold mb-2">Programs</h3>
-              <p className="text-sm text-muted-foreground">Manage degree programs and requirements</p>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="materials">
+            <MaterialsCourseView semesterId={selectedSemester} />
+          </TabsContent>
+
+          <TabsContent value="timetable">
+            <TimetableTab semesterId={selectedSemester} />
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            <AttendanceTab semesterId={selectedSemester} />
+          </TabsContent>
+
+          <TabsContent value="grades">
+            <GradesTab semesterId={selectedSemester} />
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminLayout>
   );

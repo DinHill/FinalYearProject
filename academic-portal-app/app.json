@@ -39,6 +39,9 @@
     },
     "updates": {
       "url": "https://u.expo.dev/1a98ceb2-e5d4-4448-8133-fd1ba36bb6cf"
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

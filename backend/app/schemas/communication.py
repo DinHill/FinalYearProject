@@ -24,9 +24,9 @@ class SupportTicketCreate(BaseSchema):
         pattern="^(technical|academic|financial|account|other)$"
     )
     priority: str = Field(
-        "normal",
+        "medium",  # Changed default from "normal" to "medium"
         description="Ticket priority",
-        pattern="^(low|normal|high|urgent)$"
+        pattern="^(low|medium|high|urgent)$"  # Changed "normal" to "medium"
     )
 
 
@@ -38,9 +38,9 @@ class SupportTicketUpdate(BaseSchema):
     )
     priority: Optional[str] = Field(
         None,
-        pattern="^(low|normal|high|urgent)$"
+        pattern="^(low|medium|high|urgent)$"  # Changed "normal" to "medium"
     )
-    assigned_to_id: Optional[UUID] = Field(None, description="Assign to user ID")
+    assigned_to_id: Optional[int] = Field(None, description="Assign to user ID")  # Changed UUID to int
     category: Optional[str] = Field(
         None,
         pattern="^(technical|academic|financial|account|other)$"
@@ -50,19 +50,15 @@ class SupportTicketUpdate(BaseSchema):
 class SupportTicketResponse(BaseSchema):
     """Support ticket response"""
     id: int
-    ticket_number: str
-    requester_id: UUID
-    assigned_to_id: Optional[UUID]
+    user_id: int  # Changed from requester_id (UUID) to user_id (int)
+    assigned_to: Optional[int]  # Changed from assigned_to_id to match model
     subject: str
-    description: str
-    category: str
+    description: Optional[str]
+    category: Optional[str]
     priority: str
     status: str
-    sla_deadline: datetime
-    resolved_at: Optional[datetime]
-    closed_at: Optional[datetime]
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime]
     
     class Config:
         from_attributes = True
@@ -70,8 +66,7 @@ class SupportTicketResponse(BaseSchema):
 
 class SupportTicketDetailResponse(SupportTicketResponse):
     """Support ticket with events"""
-    events: List['TicketEventResponse']
-    sla_breached: bool
+    pass  # Removed events and sla_breached (TicketEvent table doesn't exist)
 
 
 # Ticket Event Schemas
@@ -90,9 +85,11 @@ class TicketEventResponse(BaseSchema):
     """Ticket event response"""
     id: int
     ticket_id: int
-    user_id: UUID
+    created_by: int  # Changed from user_id to match model
     event_type: str
     description: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
     created_at: datetime
     
     class Config:

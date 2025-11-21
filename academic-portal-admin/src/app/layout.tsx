@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Roboto } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
+import { BackendWarmup } from "@/components/providers/backend-warmup";
+import { BadgeProvider } from "@/contexts/BadgeContext";
+import { SessionExpiredDialog } from "@/components/SessionExpiredDialog";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const roboto = Roboto({
+  variable: "--font-roboto",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -24,11 +36,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} font-sans antialiased min-h-screen`}
+        className={`${inter.variable} ${roboto.variable} font-body antialiased min-h-screen`}
       >
         <QueryProvider>
-          {children}
-          <ToastProvider />
+          <BadgeProvider>
+            <BackendWarmup />
+            {children}
+            <ToastProvider />
+            <SessionExpiredDialog />
+          </BadgeProvider>
         </QueryProvider>
       </body>
     </html>

@@ -18,10 +18,12 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
+    // Use environment variable for API proxy
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://academic-portal-api.onrender.com'
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'https://academic-portal-api.onrender.com/:path*',
+        destination: `${apiUrl}/:path*`,
       },
     ];
   },

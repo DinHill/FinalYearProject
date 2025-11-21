@@ -1,0 +1,26 @@
+{
+  "name": "greenwich-academic-portal",
+  "version": "1.0.0",
+  "description": "Greenwich Academic Portal - Full Stack Application",
+  "scripts": {
+    "start": "powershell -ExecutionPolicy Bypass -File ./start-all.ps1",
+    "start:backend": "cd backend && .\\venv\\Scripts\\activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "start:frontend": "cd academic-portal-admin && npm run dev",
+    "start:mobile": "cd academic-portal-app && npm start",
+    "start:all": "powershell -ExecutionPolicy Bypass -File ./start-all.ps1",
+    "dev": "powershell -ExecutionPolicy Bypass -File ./start-all.ps1",
+    "stop": "powershell -ExecutionPolicy Bypass -File ./stop-all.ps1"
+  },
+  "keywords": [
+    "academic-portal",
+    "greenwich",
+    "fastapi",
+    "nextjs",
+    "react-native"
+  ],
+  "author": "Greenwich Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
